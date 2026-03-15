@@ -8,11 +8,11 @@ RecruitAssist is a lightweight **Java Servlet/JSP prototype** for a Teaching Ass
 
 ### Software overview
 
-![RecruitAssist software overview](./figure/software-overview.svg)
+![RecruitAssist software overview](./figure/software-overview.png)
 
 ### Recommendation engine
 
-![RecruitAssist recommendation engine](./figure/recommendation-engine.svg)
+![RecruitAssist recommendation engine](./figure/recommendation-engine.png)
 
 ## Highlights
 

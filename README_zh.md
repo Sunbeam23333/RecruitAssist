@@ -8,11 +8,11 @@
 
 ### 软件整体结构
 
-![RecruitAssist 软件整体结构图](./figure/software-overview.svg)
+![RecruitAssist 软件整体结构图](./figure/software-overview.png)
 
 ### 推荐系统结构
 
-![RecruitAssist 推荐系统示意图](./figure/recommendation-engine.svg)
+![RecruitAssist 推荐系统示意图](./figure/recommendation-engine.png)
 
 ## 项目亮点
 
