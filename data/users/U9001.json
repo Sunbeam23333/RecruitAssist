@@ -1,0 +1,13 @@
+{
+  "userId": "U9001",
+  "username": "mo.chen",
+  "password": "demo123",
+  "role": "MO",
+  "name": "Dr Chen",
+  "studentId": "",
+  "programme": "Module Organiser",
+  "skills": ["Curriculum Design", "Assessment", "Module Delivery"],
+  "availability": "Weekdays",
+  "experience": "Owns EBU6304 and coordinates TA hiring each semester.",
+  "cvText": "Responsible for posting jobs, reviewing applicants and balancing module support."
+}
