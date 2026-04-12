@@ -1,11 +1,13 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${appName}</title>
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/app.css" />
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/app.css?v=302" />
+    <script defer src="${pageContext.request.contextPath}/assets/js/app.js?v=302"></script>
 </head>
 <body>
 <div class="page-shell">
@@ -16,9 +18,11 @@
             <p class="subtitle">A polished Servlet/JSP prototype for the Teaching Assistant Recruitment System, with explainable recommendations, operational dashboards and demo-ready seeded data.</p>
             <p class="stack">${stack}</p>
             <div class="hero-metrics">
-                <div class="hero-metric"><strong>3 roles</strong><span>TA · MO · Admin</span></div>
-                <div class="hero-metric"><strong>10+ flows</strong><span>Apply, withdraw, review, publish and balance</span></div>
-                <div class="hero-metric"><strong>Text storage</strong><span>No database setup required for demos</span></div>
+                <div class="hero-metric"><strong>${taCount}</strong><span>TA accounts ready</span></div>
+                <div class="hero-metric"><strong>${recruiterCount}</strong><span>Recruiters / MOs</span></div>
+                <div class="hero-metric"><strong>${adminCount}</strong><span>Admin accounts</span></div>
+                <div class="hero-metric"><strong>${jobCount}</strong><span>Jobs in seeded view</span></div>
+                <div class="hero-metric"><strong>${applicationCount}</strong><span>Applications for load demos</span></div>
             </div>
             <div class="hero-actions section-gap">
                 <a class="primary-button" href="${pageContext.request.contextPath}/login">Open demo login</a>
@@ -27,13 +31,13 @@
         </div>
         <aside class="spotlight-card">
             <div class="spotlight-kicker">Demo-ready experience</div>
-            <div class="spotlight-score">Live<span> prototype</span></div>
-            <h3>What you can show right now</h3>
-            <p class="muted-copy">The current build already supports explainable TA ranking, MO job lifecycle management, candidate review ordering and workload-aware admin visibility.</p>
+            <div class="spotlight-score">${taCount + recruiterCount + adminCount}<span> seeded users</span></div>
+            <h3>Now suitable for broader workflow checks</h3>
+            <p class="muted-copy">The current build now supports larger seeded workloads, so you can inspect recommendation stability, recruiter queue behaviour and admin monitoring under denser demo traffic.</p>
             <div class="spotlight-meta">
                 <span class="metric-pill">Explainable ranking</span>
                 <span class="metric-pill">Unified detail view</span>
-                <span class="metric-pill">CloudStudio previewable</span>
+                <span class="metric-pill">Higher-load seed set</span>
             </div>
         </aside>
     </header>
@@ -55,6 +59,42 @@
             <p class="muted-copy">Workload thresholds and recent application signals remain visible for operational checks and demo explanation.</p>
         </article>
     </section>
+
+    <c:if test="${not empty featuredDemoUsers}">
+        <section class="panel">
+            <div class="section-head">
+                <div>
+                    <h2>Quick demo sign-in</h2>
+                    <p class="muted-copy">Use one curated account per role to jump directly into TA, Recruiter and Admin flows from the home page.</p>
+                </div>
+                <span class="metric-pill">Password: ${demoPassword}</span>
+            </div>
+            <div class="showcase-grid">
+                <c:forEach var="demoUser" items="${featuredDemoUsers}">
+                    <article class="feature-card">
+                        <div class="section-head">
+                            <div>
+                                <div class="spotlight-kicker">${demoUser.role.label} access</div>
+                                <h3>${demoUser.name}</h3>
+                            </div>
+                            <span class="status-pill status-${demoUser.role.cssClass}">${demoUser.role.label}</span>
+                        </div>
+                        <p class="muted-copy">${demoUser.programme}</p>
+                        <div class="job-meta-row section-gap">
+                            <span class="meta-chip">Username: <code>${demoUser.username}</code></span>
+                            <span class="meta-chip">Password: <code>${demoPassword}</code></span>
+                        </div>
+                        <form class="action-row section-gap" method="post" action="${pageContext.request.contextPath}/login">
+                            <input type="hidden" name="username" value="${demoUser.username}" />
+                            <input type="hidden" name="password" value="${demoPassword}" />
+                            <button class="primary-button small-button" type="submit" data-loading-text="Signing in...">Quick sign in</button>
+                            <a class="secondary-button small-button" href="${pageContext.request.contextPath}/login">Open login page</a>
+                        </form>
+                    </article>
+                </c:forEach>
+            </div>
+        </section>
+    </c:if>
 
     <main class="content-grid dashboard-grid single-column-grid">
         <section class="panel">
@@ -97,7 +137,7 @@
                 <article class="journey-step">
                     <div class="spotlight-kicker">Step 1</div>
                     <h3>Login as a TA</h3>
-                    <p class="muted-copy">Open the recommendation dashboard, inspect the new multi-signal fit score and apply to a role.</p>
+                    <p class="muted-copy">Open the recommendation dashboard, inspect the multi-signal fit score and apply to a role from a denser seeded pool.</p>
                 </article>
                 <article class="journey-step">
                     <div class="spotlight-kicker">Step 2</div>
@@ -107,7 +147,7 @@
                 <article class="journey-step">
                     <div class="spotlight-kicker">Step 3</div>
                     <h3>Finish as Admin</h3>
-                    <p class="muted-copy">Explain how workload thresholds and recent applications support fairer allocation decisions.</p>
+                    <p class="muted-copy">Explain how workload thresholds and recent applications support fairer allocation decisions at a larger demo scale.</p>
                 </article>
             </div>
         </section>

@@ -1,0 +1,6 @@
+framework/recruitassist-web/src/main/webapp/WEB-INF/jsp/dashboard-admin.jsp
+framework/recruitassist-web/src/main/java/com/recruitassist/web/DashboardServlet.java
+framework/recruitassist-web/src/main/java/com/recruitassist/service/WorkloadService.java
+framework/recruitassist-web/src/main/java/com/recruitassist/model/view/WorkloadEntry.java
+framework/recruitassist-web/src/main/java/com/recruitassist/model/SystemConfig.java
+data/system/config.json

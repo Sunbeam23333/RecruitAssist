@@ -12,11 +12,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 @WebServlet("/dashboard")
 public class DashboardServlet extends AppServlet {
+    private static final int AUTO_REFRESH_SECONDS = 60;
+
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         UserProfile user = requireAuthenticatedUser(req, resp);
@@ -29,19 +34,47 @@ public class DashboardServlet extends AppServlet {
         req.setAttribute("appName", services(req).systemConfig().getAppName());
 
         if (user.getRole() == UserRole.TA) {
+            req.setAttribute("autoRefreshSeconds", 0);
             renderTaDashboard(req, resp, user);
             return;
         }
+
+        req.setAttribute("autoRefreshSeconds", AUTO_REFRESH_SECONDS);
+
         if (user.getRole() == UserRole.MO) {
             renderMoDashboard(req, resp, user);
             return;
         }
-        renderAdminDashboard(req, resp);
+        renderAdminDashboard(req, resp, user);
     }
 
     private void renderTaDashboard(HttpServletRequest req, HttpServletResponse resp, UserProfile user)
             throws ServletException, IOException {
-        List<JobRecommendation> recommendedJobs = services(req).recommendationService().recommendJobsFor(user);
+        String jobSearchQuery = normalizeText(req.getParameter("q"));
+        String jobSort = normalizeTaSort(req.getParameter("sort"));
+        String skillFilter = normalizeText(req.getParameter("skillFilter"));
+        String maxHoursStr = req.getParameter("maxHours");
+        String deadlineBeforeStr = req.getParameter("deadlineBefore");
+
+        int maxHours = 0;
+        if (maxHoursStr != null && !maxHoursStr.isBlank()) {
+            try { maxHours = Integer.parseInt(maxHoursStr.trim()); } catch (NumberFormatException ignored) {}
+        }
+        LocalDate deadlineBefore = null;
+        if (deadlineBeforeStr != null && !deadlineBeforeStr.isBlank()) {
+            try { deadlineBefore = LocalDate.parse(deadlineBeforeStr.trim()); } catch (Exception ignored) {}
+        }
+
+        final int finalMaxHours = maxHours;
+        final LocalDate finalDeadlineBefore = deadlineBefore;
+
+        List<JobRecommendation> recommendedJobs = services(req).recommendationService().recommendJobsFor(user).stream()
+                .filter(recommendation -> matchesRecommendationQuery(recommendation, jobSearchQuery))
+                .filter(recommendation -> matchesSkillFilter(recommendation, skillFilter))
+                .filter(recommendation -> finalMaxHours <= 0 || recommendation.getJob().getWorkloadHours() <= finalMaxHours)
+                .filter(recommendation -> finalDeadlineBefore == null || isBeforeDeadline(recommendation.getJob(), finalDeadlineBefore))
+                .sorted(taComparator(jobSort))
+                .toList();
         List<ApplicationRecord> applications = services(req).applicationService().findByApplicantId(user.getUserId());
         long acceptedApplications = applications.stream()
                 .filter(application -> application.getStatus() == ApplicationStatus.ACCEPTED)
@@ -55,15 +88,28 @@ public class DashboardServlet extends AppServlet {
         req.setAttribute("currentWorkload", services(req).workloadService().workloadForUser(user.getUserId()));
         req.setAttribute("activeApplicationCount", services(req).workloadService().activeApplicationsForUser(user.getUserId()));
         req.setAttribute("acceptedApplicationCount", acceptedApplications);
-        req.setAttribute("profileSignalCount", countProfileSignals(user));
-        req.setAttribute("profileSignalPercent", countProfileSignals(user) * 25);
+        req.setAttribute("profileSignalCount", user.getProfileSignalCount());
+        req.setAttribute("profileSignalPercent", user.getProfileSignalPercent());
+        req.setAttribute("profileReady", user.isProfileReady());
         req.setAttribute("workloadThreshold", services(req).workloadService().getThreshold());
+        req.setAttribute("jobSearchQuery", req.getParameter("q") == null ? "" : req.getParameter("q").trim());
+        req.setAttribute("skillFilter", req.getParameter("skillFilter") == null ? "" : req.getParameter("skillFilter").trim());
+        req.setAttribute("maxHours", maxHoursStr == null ? "" : maxHoursStr.trim());
+        req.setAttribute("deadlineBefore", deadlineBeforeStr == null ? "" : deadlineBeforeStr.trim());
+        req.setAttribute("jobSort", jobSort);
+        req.setAttribute("jobSortLabel", describeTaSort(jobSort));
         req.getRequestDispatcher("/WEB-INF/jsp/dashboard-ta.jsp").forward(req, resp);
     }
 
     private void renderMoDashboard(HttpServletRequest req, HttpServletResponse resp, UserProfile user)
             throws ServletException, IOException {
+        String moSearch = normalizeText(req.getParameter("moSearch"));
+
         List<JobPosting> jobs = services(req).jobService().listJobsForOwner(user.getUserId());
+        if (!moSearch.isBlank()) {
+            jobs = jobs.stream().filter(job -> matchesMoSearch(job, moSearch)).toList();
+        }
+
         Map<String, Integer> workloadByUserId = services(req).workloadService().workloadByUserId();
         Map<String, List<ApplicationRecord>> applicationsByJobId = services(req).applicationService().groupByJobIdsForReview(
                 jobs.stream().map(JobPosting::getJobId).toList(),
@@ -88,33 +134,147 @@ public class DashboardServlet extends AppServlet {
         req.setAttribute("totalApplicationCount", totalApplicationCount);
         req.setAttribute("acceptedCandidateCount", acceptedCandidateCount);
         req.setAttribute("shortlistedCandidateCount", shortlistedCount);
+        req.setAttribute("moSearchQuery", req.getParameter("moSearch") == null ? "" : req.getParameter("moSearch").trim());
         req.getRequestDispatcher("/WEB-INF/jsp/dashboard-mo.jsp").forward(req, resp);
     }
 
-    private void renderAdminDashboard(HttpServletRequest req, HttpServletResponse resp)
+    private void renderAdminDashboard(HttpServletRequest req, HttpServletResponse resp, UserProfile user)
             throws ServletException, IOException {
+        String statusFilter = normalizeAdminStatus(req.getParameter("jobStatus"));
+        String moduleQuery = normalizeText(req.getParameter("module"));
+
+        List<JobPosting> allJobs = services(req).jobService().listAllJobs();
+        List<JobPosting> visibleJobs = allJobs.stream()
+                .filter(job -> matchesAdminFilter(job, statusFilter, moduleQuery))
+                .toList();
+        Map<String, List<ApplicationRecord>> applicationsByJobId = services(req).applicationService().groupByJobIds(
+                visibleJobs.stream().map(JobPosting::getJobId).toList());
+        Map<String, Long> acceptedByJobId = new LinkedHashMap<>();
+        for (JobPosting job : visibleJobs) {
+            long accepted = applicationsByJobId.getOrDefault(job.getJobId(), List.of()).stream()
+                    .filter(application -> application.getStatus() == ApplicationStatus.ACCEPTED)
+                    .count();
+            acceptedByJobId.put(job.getJobId(), accepted);
+        }
+
+        req.setAttribute("user", user);
         req.setAttribute("workloadEntries", services(req).workloadService().buildEntries());
         req.setAttribute("latestApplications", services(req).applicationService().findRecentApplications(10));
         req.setAttribute("usersById", services(req).userService().indexById());
         req.setAttribute("jobsById", services(req).jobService().indexById());
         req.setAttribute("workloadThreshold", services(req).workloadService().getThreshold());
+        req.setAttribute("adminJobs", visibleJobs);
+        req.setAttribute("applicationsByJobId", applicationsByJobId);
+        req.setAttribute("acceptedByJobId", acceptedByJobId);
+        req.setAttribute("jobStatusFilter", statusFilter);
+        req.setAttribute("jobStatusFilterLabel", describeAdminStatus(statusFilter));
+        req.setAttribute("moduleQuery", req.getParameter("module") == null ? "" : req.getParameter("module").trim());
+        req.setAttribute("openJobTotal", allJobs.stream().filter(JobPosting::isOpen).count());
+        req.setAttribute("jobCount", allJobs.size());
+        req.setAttribute("visibleJobCount", visibleJobs.size());
+        req.setAttribute("visibleApplicantCount", applicationsByJobId.values().stream().mapToInt(List::size).sum());
         req.getRequestDispatcher("/WEB-INF/jsp/dashboard-admin.jsp").forward(req, resp);
     }
 
-    private int countProfileSignals(UserProfile user) {
-        int signals = 0;
-        if (!user.getSkills().isEmpty()) {
-            signals++;
+    private boolean matchesSkillFilter(JobRecommendation recommendation, String skillFilter) {
+        if (skillFilter.isBlank()) return true;
+        String[] skills = skillFilter.split("[,;]+");
+        String searchable = (recommendation.getJob().getRequiredSkillsSummary() + " " +
+                recommendation.getJob().getPreferredSkillsSummary()).toLowerCase();
+        for (String skill : skills) {
+            String s = skill.trim().toLowerCase();
+            if (!s.isBlank() && searchable.contains(s)) return true;
         }
-        if (!user.getAvailability().isBlank()) {
-            signals++;
+        return false;
+    }
+
+    private boolean isBeforeDeadline(JobPosting job, LocalDate before) {
+        try {
+            return LocalDate.parse(job.getDeadline()).isBefore(before) || LocalDate.parse(job.getDeadline()).isEqual(before);
+        } catch (Exception e) { return true; }
+    }
+
+    private boolean matchesMoSearch(JobPosting job, String query) {
+        String searchable = (job.getTitle() + " " + job.getModuleCode() + " " +
+                job.getRequiredSkillsSummary() + " " + job.getDescription()).toLowerCase();
+        return searchable.contains(query);
+    }
+
+    private Comparator<JobRecommendation> taComparator(String jobSort) {
+        return switch (jobSort) {
+            case "deadline" -> Comparator.comparing((JobRecommendation recommendation) -> recommendation.getJob().getDeadline())
+                    .thenComparing(Comparator.comparingDouble(JobRecommendation::getScore).reversed());
+            case "workload" -> Comparator.comparingInt(JobRecommendation::getProjectedWorkloadHours)
+                    .thenComparing(Comparator.comparingDouble(JobRecommendation::getScore).reversed());
+            default -> Comparator.comparingDouble(JobRecommendation::getScore).reversed()
+                    .thenComparing(recommendation -> recommendation.getJob().getDeadline());
+        };
+    }
+
+    private boolean matchesRecommendationQuery(JobRecommendation recommendation, String query) {
+        if (query.isBlank()) {
+            return true;
         }
-        if (!user.getExperience().isBlank()) {
-            signals++;
+        String searchable = String.join(" ",
+                recommendation.getJob().getTitle(),
+                recommendation.getJob().getModuleCode(),
+                recommendation.getJob().getDescription(),
+                recommendation.getJob().getRequiredSkillsSummary(),
+                recommendation.getJob().getPreferredSkillsSummary(),
+                recommendation.getMatchedSkillsSummary(),
+                recommendation.getMissingSkillsSummary()).toLowerCase();
+        return searchable.contains(query);
+    }
+
+    private boolean matchesAdminFilter(JobPosting job, String statusFilter, String moduleQuery) {
+        if (!"ALL".equals(statusFilter) && !job.getStatus().getCode().equalsIgnoreCase(statusFilter)) {
+            return false;
         }
-        if (!user.getCvText().isBlank()) {
-            signals++;
+        if (moduleQuery.isBlank()) {
+            return true;
         }
-        return signals;
+        String searchable = (job.getModuleCode() + " " + job.getTitle() + " " + job.getDescription()
+                + " " + job.getRequiredSkillsSummary() + " " + job.getPreferredSkillsSummary()).toLowerCase();
+        return searchable.contains(moduleQuery);
+    }
+
+    private String normalizeTaSort(String rawSort) {
+        if (rawSort == null || rawSort.isBlank()) {
+            return "score";
+        }
+        return switch (rawSort.trim().toLowerCase()) {
+            case "deadline", "workload" -> rawSort.trim().toLowerCase();
+            default -> "score";
+        };
+    }
+
+    private String describeTaSort(String jobSort) {
+        return switch (jobSort) {
+            case "deadline" -> "Closest deadline first";
+            case "workload" -> "Lowest projected workload first";
+            default -> "Best match first";
+        };
+    }
+
+    private String normalizeAdminStatus(String rawStatus) {
+        if (rawStatus == null || rawStatus.isBlank()) {
+            return "ALL";
+        }
+        return switch (rawStatus.trim().toUpperCase()) {
+            case "OPEN", "CLOSED" -> rawStatus.trim().toUpperCase();
+            default -> "ALL";
+        };
+    }
+
+    private String describeAdminStatus(String status) {
+        return switch (status) {
+            case "OPEN" -> "Open jobs only";
+            case "CLOSED" -> "Closed jobs only";
+            default -> "All jobs";
+        };
+    }
+
+    private String normalizeText(String rawValue) {
+        return rawValue == null ? "" : rawValue.trim().toLowerCase();
     }
 }

@@ -1,0 +1,7 @@
+framework/recruitassist-web/src/main/webapp/WEB-INF/jsp/job-detail.jsp
+framework/recruitassist-web/src/main/java/com/recruitassist/web/JobDetailServlet.java
+framework/recruitassist-web/src/main/java/com/recruitassist/web/UpdateApplicationStatusServlet.java
+framework/recruitassist-web/src/main/java/com/recruitassist/service/ApplicationService.java
+data/applications
+framework/recruitassist-web/src/main/java/com/recruitassist/service/RecommendationService.java
+framework/recruitassist-web/src/main/java/com/recruitassist/model/view/JobRecommendation.java

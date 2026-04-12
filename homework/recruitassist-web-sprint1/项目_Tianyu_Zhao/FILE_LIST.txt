@@ -1,0 +1,10 @@
+framework/recruitassist-web/src/main/webapp/WEB-INF/jsp/dashboard-ta.jsp
+framework/recruitassist-web/src/main/java/com/recruitassist/web/UpdateProfileServlet.java
+framework/recruitassist-web/src/main/java/com/recruitassist/service/UserService.java
+framework/recruitassist-web/src/main/java/com/recruitassist/web/UploadCvServlet.java
+framework/recruitassist-web/src/main/java/com/recruitassist/web/DownloadCvServlet.java
+data/cv
+framework/recruitassist-web/src/main/webapp/assets/css/app.css
+framework/recruitassist-web/src/main/webapp/assets/js/app.js
+framework/recruitassist-web/src/main/java/com/recruitassist/web/ApplyServlet.java
+framework/recruitassist-web/src/main/java/com/recruitassist/web/WithdrawApplicationServlet.java

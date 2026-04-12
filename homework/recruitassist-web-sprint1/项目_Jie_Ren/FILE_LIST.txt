@@ -1,0 +1,6 @@
+framework/recruitassist-web/src/main/webapp/WEB-INF/jsp/dashboard-mo.jsp
+framework/recruitassist-web/src/main/java/com/recruitassist/web/CreateJobServlet.java
+framework/recruitassist-web/src/main/java/com/recruitassist/web/UpdateJobServlet.java
+framework/recruitassist-web/src/main/java/com/recruitassist/service/JobService.java
+framework/recruitassist-web/src/main/java/com/recruitassist/web/ChangeJobStatusServlet.java
+data/jobs

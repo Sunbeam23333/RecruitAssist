@@ -6,15 +6,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${job.title} · RecruitAssist</title>
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/app.css" />
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/app.css?v=302" />
+    <script defer src="${pageContext.request.contextPath}/assets/js/app.js?v=302"></script>
 </head>
-<body>
+<body data-auto-refresh-seconds="${autoRefreshSeconds}">
 <div class="page-shell">
     <header class="hero-card home-hero dashboard-hero">
         <div>
             <div class="badge">Job Detail</div>
             <h1>${job.title}</h1>
-            <p class="subtitle">${job.moduleCode} · Deadline ${job.deadline} · Owner ${ownerName}</p>
+            <p class="subtitle">${job.moduleCode} · Deadline ${job.deadline} (${job.deadlineStatusLabel}) · Owner ${ownerName}</p>
             <div class="hero-metrics">
                 <div class="hero-metric"><strong>${applicationCount}</strong><span>Total applications</span></div>
                 <div class="hero-metric"><strong>${acceptedCount}/${job.quota}</strong><span>Accepted / quota</span></div>
@@ -25,10 +26,11 @@
             <div class="spotlight-kicker">Operational status</div>
             <div class="spotlight-score">${remainingQuota}<span> slots left</span></div>
             <h3>${job.status.label}</h3>
-            <p class="muted-copy">The workload threshold in this environment is ${workloadThreshold}h, which is used by the recommendation engine when balancing candidates.</p>
+            <p class="muted-copy">This view auto-refreshes every ${autoRefreshSeconds} seconds when the page is idle, which helps MOs and Admins see status changes faster during reviews.</p>
             <div class="spotlight-meta">
                 <span class="status-pill status-${job.status.cssClass}">${job.status.label}</span>
-                <span class="metric-pill">Owner ${ownerName}</span>
+                <span class="metric-pill">${job.deadlineStatusLabel}</span>
+                <span class="metric-pill refresh-pill" data-refresh-countdown>Refresh in ${autoRefreshSeconds}s</span>
             </div>
             <div class="action-row">
                 <a class="secondary-button small-button" href="${pageContext.request.contextPath}/dashboard">Back to dashboard</a>
@@ -70,7 +72,7 @@
             </div>
             <div class="detail-pairs">
                 <div class="detail-pair"><span>Module code</span><strong>${job.moduleCode}</strong></div>
-                <div class="detail-pair"><span>Deadline</span><strong>${job.deadline}</strong></div>
+                <div class="detail-pair"><span>Deadline</span><strong>${job.deadlineLabel} · ${job.deadlineStatusLabel}</strong></div>
                 <div class="detail-pair"><span>Required skills</span><strong>${job.requiredSkillsSummary}</strong></div>
                 <div class="detail-pair"><span>Preferred skills</span><strong>${job.preferredSkillsSummary}</strong></div>
                 <div class="detail-pair full-width"><span>Description</span><strong>${job.description}</strong></div>
@@ -98,6 +100,9 @@
                         <div class="detail-pair"><span>Preferred matched</span><strong>${recommendation.preferredMatchedSkillsSummary}</strong></div>
                         <div class="detail-pair"><span>Missing skills</span><strong>${recommendation.missingSkillsSummary}</strong></div>
                         <div class="detail-pair"><span>Status</span><strong>${existingApplication == null ? 'Not applied yet' : existingApplication.status.label}</strong></div>
+                    </div>
+                    <div class="surface-note section-gap">
+                        <strong>Tip:</strong> Uploading a CV and keeping the evidence summary current usually improves explainability and makes missing-skill guidance more useful.
                     </div>
                     <div class="signal-grid section-gap">
                         <div class="signal-card">
@@ -145,7 +150,7 @@
                                         <input type="hidden" name="applicationId" value="${existingApplication.applicationId}" />
                                         <input type="hidden" name="jobId" value="${job.jobId}" />
                                         <input type="hidden" name="returnTo" value="detail" />
-                                        <button class="secondary-button small-button" type="submit">Withdraw application</button>
+                                        <button class="secondary-button small-button" type="submit" data-loading-text="Withdrawing...">Withdraw application</button>
                                     </form>
                                 </c:if>
                             </c:when>
@@ -153,7 +158,7 @@
                                 <form class="inline-form inline-form-tight" method="post" action="${pageContext.request.contextPath}/apply">
                                     <input type="hidden" name="jobId" value="${job.jobId}" />
                                     <input type="hidden" name="returnTo" value="detail" />
-                                    <button class="primary-button" type="submit">Apply for this job</button>
+                                    <button class="primary-button" type="submit" data-loading-text="Submitting application...">Apply for this job</button>
                                 </form>
                             </c:when>
                             <c:otherwise>
@@ -200,18 +205,18 @@
                         </label>
                         <div class="field-group full-width">
                             <span>Required skills</span>
-                            <textarea class="input textarea" name="requiredSkills" rows="3" required>${job.requiredSkillsSummary}</textarea>
+                            <textarea class="textarea" name="requiredSkills" rows="3" required>${job.requiredSkillsSummary}</textarea>
                         </div>
                         <div class="field-group full-width">
                             <span>Preferred skills</span>
-                            <textarea class="input textarea" name="preferredSkills" rows="3">${job.preferredSkillsSummary}</textarea>
+                            <textarea class="textarea" name="preferredSkills" rows="3">${job.preferredSkillsSummary}</textarea>
                         </div>
                         <div class="field-group full-width">
                             <span>Description</span>
-                            <textarea class="input textarea" name="description" rows="4" required>${job.description}</textarea>
+                            <textarea class="textarea" name="description" rows="4" required>${job.description}</textarea>
                         </div>
                         <div class="form-actions full-width">
-                            <button class="primary-button" type="submit">Save changes</button>
+                            <button class="primary-button" type="submit" data-loading-text="Saving changes...">Save changes</button>
                         </div>
                     </form>
                     <div class="action-row section-gap">
@@ -224,11 +229,11 @@
                             <c:choose>
                                 <c:when test="${job.open}">
                                     <input type="hidden" name="status" value="CLOSED" />
-                                    <button class="secondary-button small-button" type="submit">Close applications</button>
+                                    <button class="secondary-button small-button" type="submit" data-loading-text="Closing applications...">Close applications</button>
                                 </c:when>
                                 <c:otherwise>
                                     <input type="hidden" name="status" value="OPEN" />
-                                    <button class="primary-button small-button" type="submit">Reopen applications</button>
+                                    <button class="primary-button small-button" type="submit" data-loading-text="Reopening applications...">Reopen applications</button>
                                 </c:otherwise>
                             </c:choose>
                         </form>
@@ -260,7 +265,7 @@
                     <h2>Applications for this job</h2>
                     <p class="muted-copy">${visibleApplicationCount} of ${applicationCount} applications shown in the current view.</p>
                 </div>
-                <span class="metric-pill">Owner / Admin view</span>
+                <span class="metric-pill refresh-pill" data-refresh-countdown>Refresh in ${autoRefreshSeconds}s</span>
             </div>
             <form class="inline-form section-gap" method="get" action="${pageContext.request.contextPath}/jobs/detail">
                 <input type="hidden" name="jobId" value="${job.jobId}" />
@@ -291,6 +296,7 @@
                         <th>Current workload</th>
                         <th>Recommendation</th>
                         <th>Status</th>
+                        <th>CV</th>
                         <th>Action</th>
                     </tr>
                     </thead>
@@ -316,6 +322,17 @@
                             <td><span class="status-pill status-${application.status.cssClass}">${application.status.label}</span></td>
                             <td>
                                 <c:choose>
+                                    <c:when test="${candidate.cvAvailable}">
+                                        <a class="inline-link" href="${pageContext.request.contextPath}/cv/download?userId=${candidate.userId}&jobId=${job.jobId}">Download CV</a>
+                                        <div class="muted-copy">${candidate.cvUploadedAtLabel}</div>
+                                    </c:when>
+                                    <c:otherwise>
+                                        <span class="muted-copy">No CV uploaded</span>
+                                    </c:otherwise>
+                                </c:choose>
+                            </td>
+                            <td>
+                                <c:choose>
                                     <c:when test="${canReview and application.status.code != 'WITHDRAWN'}">
                                         <form class="inline-form" method="post" action="${pageContext.request.contextPath}/applications/status">
                                             <input type="hidden" name="applicationId" value="${application.applicationId}" />
@@ -330,7 +347,7 @@
                                                 <c:if test="${application.status.code != 'ACCEPTED'}"><option value="ACCEPTED">Accepted</option></c:if>
                                                 <c:if test="${application.status.code != 'REJECTED'}"><option value="REJECTED">Rejected</option></c:if>
                                             </select>
-                                            <button class="primary-button small-button" type="submit">Update</button>
+                                            <button class="primary-button small-button" type="submit" data-loading-text="Updating...">Update</button>
                                         </form>
                                     </c:when>
                                     <c:when test="${application.status.code == 'WITHDRAWN'}">
@@ -344,10 +361,10 @@
                         </tr>
                     </c:forEach>
                     <c:if test="${empty applications and applicationCount > 0}">
-                        <tr><td colspan="6" class="empty-state">No applications match the current sort and status filter.</td></tr>
+                        <tr><td colspan="7" class="empty-state">No applications match the current sort and status filter.</td></tr>
                     </c:if>
                     <c:if test="${empty applications and applicationCount == 0}">
-                        <tr><td colspan="6" class="empty-state">No applications have been submitted for this job yet.</td></tr>
+                        <tr><td colspan="7" class="empty-state">No applications have been submitted for this job yet.</td></tr>
                     </c:if>
                     </tbody>
                 </table>

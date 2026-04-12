@@ -6,9 +6,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MO Dashboard · RecruitAssist</title>
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/app.css" />
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/app.css?v=302" />
+    <script defer src="${pageContext.request.contextPath}/assets/js/app.js?v=302"></script>
 </head>
-<body>
+<body data-auto-refresh-seconds="${autoRefreshSeconds}">
 <div class="page-shell">
     <header class="hero-card home-hero dashboard-hero">
         <div>
@@ -25,10 +26,11 @@
             <div class="spotlight-kicker">Recruitment overview</div>
             <div class="spotlight-score">${acceptedCandidateCount}<span> accepted</span></div>
             <h3>Shortlist pressure at a glance</h3>
-            <p class="muted-copy">You currently have ${shortlistedCandidateCount} shortlisted candidates across your modules. Each candidate table below is already ordered with refreshed recommendation scores.</p>
+            <p class="muted-copy">You currently have ${shortlistedCandidateCount} shortlisted candidates across your modules. This dashboard auto-refreshes every ${autoRefreshSeconds} seconds when idle.</p>
             <div class="spotlight-meta">
                 <span class="metric-pill">Default review order</span>
                 <span class="metric-pill">Live queue refresh</span>
+                <span class="metric-pill refresh-pill" data-refresh-countdown>Refresh in ${autoRefreshSeconds}s</span>
             </div>
             <div class="action-row">
                 <a class="secondary-button small-button" href="${pageContext.request.contextPath}/logout">Log out</a>
@@ -63,6 +65,52 @@
         </article>
     </section>
 
+    <c:if test="${not empty jobs}">
+        <section class="panel">
+            <div class="section-head">
+                <div>
+                    <h2>Your active recruiting jobs</h2>
+                    <p class="muted-copy">These are the specific roles currently owned by your recruiter account. Jump straight into each queue or open the full detail view.</p>
+                </div>
+                <span class="metric-pill">${jobs.size()} owned roles</span>
+            </div>
+            <form class="filter-bar section-gap" method="get" action="${pageContext.request.contextPath}/dashboard">
+                <label class="field-group compact-field">
+                    <span>Search jobs or candidates</span>
+                    <input class="input" type="text" name="moSearch" value="${moSearchQuery}" placeholder="Search by module, title, skill or candidate name" />
+                </label>
+                <div class="form-actions compact-actions">
+                    <button class="secondary-button small-button" type="submit">Search</button>
+                    <a class="secondary-button small-button" href="${pageContext.request.contextPath}/dashboard">Clear</a>
+                </div>
+            </form>
+            <div class="showcase-grid">
+                <c:forEach var="job" items="${jobs}">
+                    <c:set var="jobApplications" value="${applicationsByJobId[job.jobId]}" />
+                    <article class="feature-card">
+                        <div class="section-head">
+                            <div>
+                                <div class="spotlight-kicker">${job.moduleCode}</div>
+                                <h3>${job.title}</h3>
+                            </div>
+                            <span class="status-pill status-${job.status.cssClass}">${job.status.label}</span>
+                        </div>
+                        <p class="muted-copy">${job.deadlineStatusLabel} · quota ${job.quota} · workload ${job.workloadHours}h</p>
+                        <div class="job-meta-row section-gap">
+                            <span class="meta-chip">Job ID: ${job.jobId}</span>
+                            <span class="meta-chip">Applications: ${jobApplications.size()}</span>
+                            <span class="meta-chip">Deadline: ${job.deadlineLabel}</span>
+                        </div>
+                        <div class="action-row section-gap">
+                            <a class="primary-button small-button" href="#job-${job.jobId}">Jump to queue</a>
+                            <a class="secondary-button small-button" href="${pageContext.request.contextPath}/jobs/detail?jobId=${job.jobId}">Open details</a>
+                        </div>
+                    </article>
+                </c:forEach>
+            </div>
+        </section>
+    </c:if>
+
     <section class="panel">
         <div class="section-head">
             <div>
@@ -94,18 +142,18 @@
             </label>
             <div class="field-group full-width">
                 <span>Required skills</span>
-                <textarea class="input textarea" name="requiredSkills" rows="3" placeholder="Java, OOP, Communication" required></textarea>
+                <textarea class="textarea" name="requiredSkills" rows="3" placeholder="Java, OOP, Communication" required></textarea>
             </div>
             <div class="field-group full-width">
                 <span>Preferred skills</span>
-                <textarea class="input textarea" name="preferredSkills" rows="3" placeholder="Testing, Marking, Leadership"></textarea>
+                <textarea class="textarea" name="preferredSkills" rows="3" placeholder="Testing, Marking, Leadership"></textarea>
             </div>
             <div class="field-group full-width">
                 <span>Description</span>
-                <textarea class="input textarea" name="description" rows="4" placeholder="Describe what the TA will support in this role." required></textarea>
+                <textarea class="textarea" name="description" rows="4" placeholder="Describe what the TA will support in this role." required></textarea>
             </div>
             <div class="form-actions full-width">
-                <button class="primary-button" type="submit">Publish job</button>
+                <button class="primary-button" type="submit" data-loading-text="Publishing job...">Publish job</button>
             </div>
         </form>
     </section>
@@ -117,11 +165,11 @@
     </c:if>
 
     <c:forEach var="job" items="${jobs}">
-        <section class="panel section-gap">
+        <section class="panel section-gap" id="job-${job.jobId}">
             <div class="section-head">
                 <div>
                     <h2>${job.title}</h2>
-                    <p class="muted-copy">${job.moduleCode} · Quota ${job.quota} · Workload ${job.workloadHours}h</p>
+                    <p class="muted-copy">${job.moduleCode} · Quota ${job.quota} · Workload ${job.workloadHours}h · ${job.deadlineStatusLabel}</p>
                 </div>
                 <div class="top-actions">
                     <span class="status-pill status-${job.status.cssClass}">${job.status.label}</span>
@@ -130,11 +178,11 @@
                         <c:choose>
                             <c:when test="${job.open}">
                                 <input type="hidden" name="status" value="CLOSED" />
-                                <button class="secondary-button small-button" type="submit">Close job</button>
+                                <button class="secondary-button small-button" type="submit" data-loading-text="Closing...">Close job</button>
                             </c:when>
                             <c:otherwise>
                                 <input type="hidden" name="status" value="OPEN" />
-                                <button class="primary-button small-button" type="submit">Reopen</button>
+                                <button class="primary-button small-button" type="submit" data-loading-text="Reopening...">Reopen</button>
                             </c:otherwise>
                         </c:choose>
                     </form>
@@ -153,7 +201,7 @@
                     <h3>Candidate queue</h3>
                     <p class="muted-copy">Applicants are ranked by refreshed recommendation score first, then lighter workload.</p>
                 </div>
-                <span class="metric-pill">Default review order</span>
+                <span class="metric-pill refresh-pill" data-refresh-countdown>Refresh in ${autoRefreshSeconds}s</span>
             </div>
             <div class="table-wrapper section-gap">
                 <table class="data-table">
@@ -163,6 +211,7 @@
                         <th>Skills</th>
                         <th>Current workload</th>
                         <th>Recommendation</th>
+                        <th>CV</th>
                         <th>Status</th>
                         <th>Action</th>
                     </tr>
@@ -173,7 +222,7 @@
                         <tr>
                             <td>
                                 <strong>${candidate.name}</strong>
-                                <div class="muted-copy">${candidate.studentId}</div>
+                                <div class="muted-copy">${candidate.studentId} · ${candidate.programme}</div>
                                 <div class="muted-copy">${candidate.availability}</div>
                             </td>
                             <td>${candidate.skillsSummary}</td>
@@ -183,6 +232,14 @@
                             <td>
                                 <strong>${application.recommendationPercent}%</strong>
                                 <div class="muted-copy">${application.explanationSummary}</div>
+                            </td>
+                            <td>
+                                <c:choose>
+                                    <c:when test="${candidate.cvAvailable}">
+                                        <a class="secondary-button small-button" href="${pageContext.request.contextPath}/cv/download?userId=${candidate.userId}&jobId=${job.jobId}">Download</a>
+                                    </c:when>
+                                    <c:otherwise><span class="muted-copy">No CV</span></c:otherwise>
+                                </c:choose>
                             </td>
                             <td><span class="status-pill status-${application.status.cssClass}">${application.status.label}</span></td>
                             <td>
@@ -201,7 +258,7 @@
                                                 <c:if test="${application.status.code != 'ACCEPTED'}"><option value="ACCEPTED">Accepted</option></c:if>
                                                 <c:if test="${application.status.code != 'REJECTED'}"><option value="REJECTED">Rejected</option></c:if>
                                             </select>
-                                            <button class="primary-button small-button" type="submit">Update</button>
+                                            <button class="primary-button small-button" type="submit" data-loading-text="Updating...">Update</button>
                                         </form>
                                     </c:otherwise>
                                 </c:choose>
@@ -209,7 +266,7 @@
                         </tr>
                     </c:forEach>
                     <c:if test="${empty applicationsByJobId[job.jobId]}">
-                        <tr><td colspan="6" class="empty-state">No applications received yet for this job.</td></tr>
+                        <tr><td colspan="7" class="empty-state">No applications received yet for this job.</td></tr>
                     </c:if>
                     </tbody>
                 </table>

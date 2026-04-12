@@ -17,6 +17,8 @@ import java.util.Map;
 
 @WebServlet("/jobs/detail")
 public class JobDetailServlet extends AppServlet {
+    private static final int AUTO_REFRESH_SECONDS = 60;
+
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         UserProfile user = requireAuthenticatedUser(req, resp);
@@ -64,6 +66,7 @@ public class JobDetailServlet extends AppServlet {
         req.setAttribute("canManage", canManage);
         req.setAttribute("showApplications", showApplications);
         req.setAttribute("workloadThreshold", services(req).workloadService().getThreshold());
+        req.setAttribute("autoRefreshSeconds", AUTO_REFRESH_SECONDS);
 
         if (taView) {
             JobRecommendation recommendation = services(req).recommendationService().recommend(user, job);
@@ -73,7 +76,7 @@ public class JobDetailServlet extends AppServlet {
 
             req.setAttribute("recommendation", recommendation);
             req.setAttribute("existingApplication", existingApplication);
-            req.setAttribute("canApplyToJob", job.isOpen() && existingApplication == null);
+            req.setAttribute("canApplyToJob", job.isAcceptingApplications((int) acceptedCount) && existingApplication == null);
             req.setAttribute(
                     "canWithdrawApplication",
                     existingApplication != null && existingApplication.getStatus() != ApplicationStatus.REJECTED);

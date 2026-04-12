@@ -1,0 +1,12 @@
+framework/recruitassist-web/src/main/webapp/index.jsp
+framework/recruitassist-web/src/main/webapp/WEB-INF/jsp/login.jsp
+framework/recruitassist-web/src/main/java/com/recruitassist/web/LoginServlet.java
+framework/recruitassist-web/src/main/java/com/recruitassist/web/LogoutServlet.java
+README.md
+README_zh.md
+framework/recruitassist-web/src/main/webapp/WEB-INF/jsp/home.jsp
+framework/recruitassist-web/src/main/java/com/recruitassist/web/HomeServlet.java
+figure/recommendation-engine.png
+figure/software-overview.png
+figure/system-architecture.png
+PERFORMANCE_EVOLUTION.md
