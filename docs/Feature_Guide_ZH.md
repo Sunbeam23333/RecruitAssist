@@ -1,7 +1,7 @@
 # RecruitAssist — 功能介绍与使用手册
 
-> **版本**: v3.0.0 (Sprint 3 完整版)  
-> **日期**: 2026年4月  
+> **版本**: v4.0.0 (Sprint 4 完整版)  
+> **日期**: 2026年5月  
 > **团队**: 第38组, EBU6304 软件工程
 
 ---
@@ -35,7 +35,7 @@
 - **零数据库架构**：所有数据以 JSON/CSV/TXT 文件存储，内置缓存和并发控制
 - **输入验证与安全防护**：XSS 防护、文件类型白名单、配额一致性校验
 
-### 系统规模统计（v3.0.0）
+### 系统规模统计（v4.0.0）
 
 | 指标 | 数量 |
 |------|------|
@@ -47,6 +47,19 @@
 | 演示用户 | 100+ |
 | 演示岗位 | 50+ |
 | 演示申请 | 500+ |
+
+### 功能负责人速查
+
+为了方便演示和评分，每个功能区域都对应到负责人、代码路径和可展示例子：
+
+| 负责人 | 功能区域 | 代码路径 | 用户可见例子 |
+|--------|----------|----------|--------------|
+| Yi Qi | 登录、注册、首页、会话入口 UI | `LoginServlet.java`, `RegisterServlet.java`, `LogoutServlet.java`, `HomeServlet.java`, `login.jsp`, `register.jsp`, `home.jsp` | 访客打开 `/home` 查看实时统计，使用快速登录或注册 TA/MO 账号，然后进入对应仪表盘。 |
+| Tianyu Zhao | TA 仪表盘、Profile、CV、申请/撤回流程 | `UpdateProfileServlet.java`, `UploadCvServlet.java`, `DownloadCvServlet.java`, `ApplyServlet.java`, `WithdrawApplicationServlet.java`, `dashboard-ta.jsp` | TA 修改技能、上传 CV、申请推荐岗位，并在申请历史中看到记录。 |
+| Jie Ren | MO 仪表盘、岗位 CRUD、候选人管理 | `CreateJobServlet.java`, `UpdateJobServlet.java`, `ChangeJobStatusServlet.java`, `JobService.java`, `dashboard-mo.jsp`, `job-detail.jsp` | MO 创建岗位、编辑要求、查看排序后的候选人，并将申请改为 Shortlisted/Accepted/Rejected。 |
+| Haopeng Jin | 推荐引擎、申请生命周期、安全与高可用加固 | `RecommendationService.java`, `ApplicationService.java`, `AppServlet.java`, `JsonFileStore.java`, `IdCounterRepository.java`, `scripts/load_test_recruitassist.py` | 系统解释 TA-岗位匹配原因，防重复申请，校验 CSRF token，提供 `/health`，并支持负载测试。 |
+| Zhuang Hou | Admin 仪表盘、工作量监控、CSV 导出 | `DashboardServlet.renderAdminDashboard()`, `WorkloadService.java`, `AdminExportServlet.java`, `dashboard-admin.jsp` | Admin 查看 TA 工作量风险，并导出 jobs/applications/workload CSV 报表。 |
+| Zexuan Dong | 文件基础设施、Repository、启动初始化和测试 | `AppPaths.java`, `AppServices.java`, `JsonFileStore.java`, repositories, `AppBootstrapListener.java`, `src/test/java/**` | 项目无需数据库即可运行：用户、岗位、申请、通知、配置和审计日志存储在 JSON/CSV/TXT 文件中。 |
 
 ---
 

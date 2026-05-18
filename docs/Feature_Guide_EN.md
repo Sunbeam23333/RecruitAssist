@@ -1,7 +1,7 @@
 # RecruitAssist — Feature Guide & User Manual
 
-> **Version**: v3.0.0 (Sprint 3 Complete)  
-> **Date**: April 2026  
+> **Version**: v4.0.0 (Sprint 4 Complete)  
+> **Date**: May 2026  
 > **Team**: Group 38, EBU6304 Software Engineering
 
 ---
@@ -35,7 +35,7 @@
 - **Zero-Database Architecture**: All data stored as JSON/CSV/TXT files with built-in caching and concurrency control
 - **Production-Ready Input Validation**: XSS prevention, file type whitelist, quota consistency enforcement
 
-### System Statistics (v3.0.0)
+### System Statistics (v4.0.0)
 
 | Metric | Value |
 |--------|-------|
@@ -47,6 +47,19 @@
 | Demo Users | 100+ |
 | Demo Jobs | 50+ |
 | Demo Applications | 500+ |
+
+### Feature Ownership Reference
+
+For presentation and marking, each feature area can be traced to an owner, code path, and visible demo example:
+
+| Owner | Feature Area | Code Paths | User-Facing Example |
+|-------|--------------|------------|---------------------|
+| Yi Qi | Login, registration, homepage, session entry UI | `LoginServlet.java`, `RegisterServlet.java`, `LogoutServlet.java`, `HomeServlet.java`, `login.jsp`, `register.jsp`, `home.jsp` | A visitor opens `/home`, sees live stats, uses quick sign-in or registers a TA/MO account, then enters the correct dashboard. |
+| Tianyu Zhao | TA dashboard, profile, CV, apply/withdraw flow | `UpdateProfileServlet.java`, `UploadCvServlet.java`, `DownloadCvServlet.java`, `ApplyServlet.java`, `WithdrawApplicationServlet.java`, `dashboard-ta.jsp` | A TA updates skills, uploads a CV, applies for a recommended job, and sees the application in history. |
+| Jie Ren | MO dashboard, job CRUD, candidate management | `CreateJobServlet.java`, `UpdateJobServlet.java`, `ChangeJobStatusServlet.java`, `JobService.java`, `dashboard-mo.jsp`, `job-detail.jsp` | An MO creates a job, edits requirements, reviews ranked candidates, and changes an application to Shortlisted/Accepted/Rejected. |
+| Haopeng Jin | Recommendation engine, application lifecycle, security and availability hardening | `RecommendationService.java`, `ApplicationService.java`, `AppServlet.java`, `JsonFileStore.java`, `IdCounterRepository.java`, `scripts/load_test_recruitassist.py` | The system explains a TA-job match, prevents duplicate applications, validates CSRF tokens, exposes `/health`, and supports load testing. |
+| Zhuang Hou | Admin dashboard, workload monitoring, CSV export | `DashboardServlet.renderAdminDashboard()`, `WorkloadService.java`, `AdminExportServlet.java`, `dashboard-admin.jsp` | Admin checks TA workload risk and exports jobs/applications/workload CSV reports. |
+| Zexuan Dong | File-backed infrastructure, repositories, bootstrap and tests | `AppPaths.java`, `AppServices.java`, `JsonFileStore.java`, repositories, `AppBootstrapListener.java`, `src/test/java/**` | The project runs without a database: JSON/CSV/TXT files store users, jobs, applications, notifications, config and audit logs. |
 
 ---
 
