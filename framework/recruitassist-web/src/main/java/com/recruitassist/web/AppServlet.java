@@ -4,6 +4,7 @@ import com.recruitassist.config.AppContextKeys;
 import com.recruitassist.config.AppServices;
 import com.recruitassist.model.UserProfile;
 import com.recruitassist.model.UserRole;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -15,6 +16,13 @@ public abstract class AppServlet extends HttpServlet {
     protected static final String SESSION_USER_ID = "sessionUserId";
     private static final String FLASH_TONE = "flashTone";
     private static final String FLASH_MESSAGE = "flashMessage";
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        applySecurityHeaders(response);
+        super.service(request, response);
+    }
 
     protected AppServices services(HttpServletRequest request) {
         return (AppServices) getServletContext().getAttribute(AppContextKeys.SERVICES);
@@ -81,5 +89,12 @@ public abstract class AppServlet extends HttpServlet {
 
     protected void redirect(HttpServletRequest request, HttpServletResponse response, String path) throws IOException {
         response.sendRedirect(request.getContextPath() + path);
+    }
+
+    private void applySecurityHeaders(HttpServletResponse response) {
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        response.setHeader("X-Frame-Options", "DENY");
+        response.setHeader("Referrer-Policy", "no-referrer");
+        response.setHeader("Cache-Control", "no-store");
     }
 }

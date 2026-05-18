@@ -39,10 +39,10 @@
 
 | Metric | Value |
 |--------|-------|
-| Java Classes | 42 |
+| Java Classes | 45 |
 | JSP Pages | 8 |
-| Servlets | 16 (1 abstract base + 15 concrete) |
-| Services | 6 |
+| Servlets | 17 (1 abstract base + 16 concrete) |
+| Services | 7 |
 | Repositories | 6 |
 | Demo Users | 100+ |
 | Demo Jobs | 50+ |
@@ -114,6 +114,9 @@ Open http://127.0.0.1:8081/ in your browser.
 - Session-based state management with `HttpSession`
 - **Session fixation protection**: after a successful login, the old session is invalidated and a fresh session is created before storing the authenticated user ID
 - **Username enumeration protection**: failed login attempts always show the same "Invalid username or password" message
+- **Password hashing**: newly registered passwords are stored with PBKDF2-HMAC-SHA256; legacy demo plaintext passwords remain readable for backwards-compatible seed data
+- **Failed login throttling**: five consecutive failed attempts for the same username key trigger a temporary 5-minute lockout
+- **Session hardening**: authenticated sessions expire after 30 minutes of inactivity and all Servlet responses include baseline security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Cache-Control`)
 - Flash message system for success/error feedback (for example, "Signed in as Amelia Chen.")
 - **Demo user quick-select panel**: the login page shows up to 3 TA accounts, 2 MO accounts, and 1 Admin account, and the "Use account" button auto-fills the form
 - **Live account statistics**: total users, TA count, MO count, and Admin count are displayed in the login page header
@@ -130,7 +133,7 @@ Open http://127.0.0.1:8081/ in your browser.
 | Username uniqueness | Server | `findByUsername()` lookup |
 | Display name uniqueness | Server | Case-insensitive scan of existing user display names |
 | Password length | Client + Server | HTML5 `minlength=6` + Java length check |
-| Password confirmation | Server | `password.equals(confirmPassword)` |
+| Password confirmation | Server | `password.equals(confirmPassword)`, then PBKDF2 hash before persistence |
 | Admin role block | Server | `role == ADMIN` is rejected |
 | Email format | Client + Server | HTML5 `type=email` + Java regex |
 | XSS prevention | Server | `cleanText()` strips angle brackets and control characters |
@@ -151,6 +154,11 @@ Open http://127.0.0.1:8081/ in your browser.
 - Shows feature cards for the TA, MO, and Admin workflows
 - Includes a suggested 3-step demo path for presentations
 - Authenticated users are automatically redirected to their dashboard
+
+**Health Check** (`/health`)
+- Public readiness endpoint for Sprint 4 deployment checks
+- Verifies required directories are present and returns live user/job/application counts
+- Returns HTTP 200 with `{"status":"UP"}` when the file-backed application is readable, or HTTP 503 with `{"status":"DOWN"}` when a runtime storage check fails
 
 ### 4.2 TA Features
 
@@ -359,6 +367,13 @@ logs/
 - **Atomic writes**: Data written to temp file first, then atomically moved to target path
 - **Cache invalidation**: Automatic on write operations; directory cache invalidated by prefix matching
 
+### Sprint 4 Concurrency Evidence
+
+- `ApplicationService` serialises application submission and status updates with a write lock, so duplicate active applications are checked and written as one critical section.
+- `IdCounterRepository` uses a lock around counter read/update/write, preventing duplicated IDs under concurrent creation.
+- `ApplicationConcurrencyTest` launches 24 simultaneous submissions for the same TA/job pair and verifies that exactly one succeeds and exactly one JSON application record is persisted.
+- `PasswordHasherTest` and `AuthServiceTest` cover PBKDF2 verification, legacy demo password compatibility, and temporary lockout after repeated login failures.
+
 ---
 
 ## 6. Configuration
@@ -400,6 +415,7 @@ logs/
 | Method | URL | Role | Description |
 |--------|-----|------|-------------|
 | GET | `/home` | Public | Landing page with system stats |
+| GET | `/health` | Public | Readiness/health check for deployment |
 | GET/POST | `/login` | Public | Login form / authenticate |
 | GET/POST | `/register` | Public | Registration form / create TA or MO account |
 | GET | `/logout` | Authenticated | End session |

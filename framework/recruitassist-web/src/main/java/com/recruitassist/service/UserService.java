@@ -73,7 +73,7 @@ public class UserService {
         UserProfile newUser = new UserProfile();
         newUser.setUserId(userId);
         newUser.setUsername(cleanUsername);
-        newUser.setPassword(password);
+        newUser.setPassword(PasswordHasher.hash(password));
         newUser.setRole(role);
         newUser.setName(cleanName.isBlank() ? cleanUsername : cleanName);
         newUser.setEmail(cleanEmail);

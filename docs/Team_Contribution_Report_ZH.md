@@ -37,6 +37,8 @@
 - 登录页面展示**演示用户快速选择面板**：最多 3 个 TA、2 个 MO、1 个 Admin 账号，每个账号带 "Use account" 按钮，可通过前端 `data-fill-login` 自动填充表单
 - 登录页顶部显示**实时账号统计**：总账号数、TA 数、MO 数、Admin 数，便于 demo 时说明数据规模
 - 登录成功后显式销毁旧会话并创建新会话，防止会话固定攻击
+- 新注册用户密码通过 PBKDF2-HMAC-SHA256 哈希后保存；旧演示账号的明文密码保持兼容
+- 同一用户名连续 5 次失败会触发 5 分钟临时锁定，降低暴力尝试风险
 - Flash 消息系统显示成功/错误反馈（如 "Signed in as Amelia Chen."）
 - 登录失败仅显示通用错误 "Invalid username or password"，不暴露具体是用户名还是密码错误，降低用户名枚举风险
 - 登录失败后保留已输入用户名，提升表单体验；已登录用户访问 `/login` 会自动跳转到 `/dashboard`
@@ -47,6 +49,7 @@
 - **用户名校验**：3-30 位，只允许字母、数字、点、下划线和连字符；保存前统一转小写并检查唯一性
 - **显示名称唯一性校验**：对现有用户名称做大小写不敏感比较，避免 demo 中出现重复展示名
 - **邮箱与密码校验**：邮箱格式前后端双层校验；密码至少 6 位，并要求与确认密码一致
+- **密码持久化加固**：注册通过后调用 `PasswordHasher.hash()`，不再把新用户密码明文写入 JSON
 - **输入清洗与 XSS 防护**：通过 `cleanText()` 去除 `< >` 和控制字符，并限制字段最大长度
 - **粘性表单**：注册失败后保留用户名、姓名、邮箱和已选角色，用户无需重新填写
 - 注册成功后写入 Flash 消息并跳转登录页，引导用户用新账号登录
@@ -65,7 +68,8 @@
 
 **认证服务** (`AuthService.java`)
 - 接收用户名和密码，先进行空值与空白输入检查
-- 调用 `UserService.findByUsername()` 查询用户，并用 `String.equals()` 比对密码
+- 调用 `UserService.findByUsername()` 查询用户，并通过 `PasswordHasher.verify()` 验证 PBKDF2 哈希或旧演示明文密码
+- 记录失败尝试次数，达到阈值后临时锁定对应用户名键
 - 返回 `Optional<UserProfile>`，失败时为空，Servlet 层据此决定转发回登录页或进入仪表盘
 - 认证逻辑与 Servlet 展示逻辑分离，便于测试和复用
 
@@ -119,7 +123,7 @@ if (!result.isSuccess()) {
 }
 ```
 
-验证链覆盖用户名格式、用户名唯一性、显示名称唯一性、密码长度、密码确认、Admin 注册封锁、邮箱格式和文本清洗。成功后通过 `IdCounterRepository` 生成新用户 ID，并写入 `data/users/{userId}.json`。
+验证链覆盖用户名格式、用户名唯一性、显示名称唯一性、密码长度、密码确认、Admin 注册封锁、邮箱格式和文本清洗。成功后通过 `IdCounterRepository` 生成新用户 ID，并将 PBKDF2 密码哈希写入 `data/users/{userId}.json`。
 
 **3. 演示用户快选面板** — `LoginServlet.java`
 
@@ -446,7 +450,7 @@ public Map<String, Integer> workloadByUserId() {
 - 启动时 `AppBootstrapListener` 初始化 `AppServices` 单例：创建 `JsonFileStore` → 6 个 Repository → 6 个 Service，按依赖顺序注入。所有 Service 通过构造函数注入依赖。
 
 **认证服务** (`AuthService.java`)
-- 接收用户名和密码，去除空白后按用户名查找用户并比对密码。返回 `Optional<UserProfile>` — 失败为空，成功返回用户对象。（当前为演示目的使用明文比对。）
+- 接收用户名和密码，去除空白后按用户名查找用户，验证 PBKDF2 密码哈希并兼容旧演示明文种子数据；连续失败会临时锁定用户名键。返回 `Optional<UserProfile>` — 失败为空，成功返回用户对象。
 
 **数据结构**：`data/users/`（用户 Profile JSON）、`data/jobs/`（岗位 JSON）、`data/applications/`（申请记录 JSON）、`data/cv/`（上传的 CV 文件）、`data/system/config.json`（系统配置）、`data/system/id-counters.json`（自增 ID 计数器）、`logs/access/audit.csv`（审计日志）。
 

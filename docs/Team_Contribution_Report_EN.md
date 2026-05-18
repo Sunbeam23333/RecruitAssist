@@ -65,6 +65,7 @@
 - **Display name uniqueness check**: case-insensitive comparison against all existing user names to prevent duplicate display names
 - **Email format validation**: regex `^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$`
 - **Password confirmation**: client-side `minlength=6` + server-side length check + password match verification
+- **Password storage hardening**: accepted passwords are hashed with PBKDF2-HMAC-SHA256 before being written to JSON
 - **Input sanitisation**: all text fields are cleaned via `cleanText()` — strips `<>` tags (XSS prevention), removes control characters, enforces per-field max length
 - **Sticky form fields**: on validation failure, previously entered username, name, email, and selected role are preserved in the form to avoid re-typing
 - On success, a flash message is set ("Account created successfully!") and the user is redirected to `/login` to sign in with their new credentials
@@ -85,7 +86,8 @@
 **Authentication Service** (`AuthService.java`)
 - Accepts username and password, trims and normalises whitespace
 - Looks up user by username via `UserService.findByUsername()`
-- Compares passwords using `String.equals()` — simple comparison suitable for a demo/academic prototype
+- Verifies PBKDF2 password hashes while keeping legacy demo plaintext seed accounts compatible
+- Tracks failed login attempts and temporarily locks a username key after 5 consecutive failures
 - Returns `Optional<UserProfile>` — empty on failure, present on success
 - Null-safe: returns empty Optional immediately if either username or password is null or blank
 
@@ -230,7 +232,7 @@ public ActionResult registerUser(String username, String password,
     UserProfile newUser = new UserProfile();
     newUser.setUserId(userId);
     newUser.setUsername(cleanUsername);
-    newUser.setPassword(password);
+    newUser.setPassword(PasswordHasher.hash(password));
     newUser.setRole(role);
     newUser.setName(cleanName.isBlank() ? cleanUsername : cleanName);
     newUser.setEmail(cleanEmail);
@@ -297,7 +299,7 @@ When clicked, `app.js` reads the `data-username` and `data-password` attributes 
 **4. Authentication Service** (`AuthService.java`)
 
 ```java
-// AuthService.java (lines 7-28)
+// AuthService.java — authenticate() (excerpt)
 public class AuthService {
     private final UserService userService;
 
@@ -316,15 +318,28 @@ public class AuthService {
             return Optional.empty();
         }
 
-        return userService.findByUsername(normalizedUsername)
-                .filter(user -> user.getPassword().equals(normalizedPassword));
+        if (isTemporarilyLocked(normalizedUsername)) {
+            return Optional.empty();
+        }
+
+        Optional<UserProfile> authenticated = userService.findByUsername(normalizedUsername)
+                .filter(user -> PasswordHasher.verify(normalizedPassword, user.getPassword()));
+        if (authenticated.isPresent()) {
+            loginAttempts.remove(normalizedUsername.toLowerCase());
+            return authenticated;
+        }
+
+        recordFailure(normalizedUsername);
+        return Optional.empty();
     }
 }
 ```
 
 Design decisions:
 - **Null-safe**: returns `Optional.empty()` immediately for null/blank inputs
-- **Input normalisation**: trims whitespace from both username and password before comparison
+- **Input normalisation**: trims whitespace before lookup and verification
+- **Hash-first verification**: `PasswordHasher.verify()` checks PBKDF2 hashes and legacy demo plaintext values using constant-time comparison
+- **Brute-force resistance**: 5 failed attempts temporarily lock the username key for 5 minutes
 - **Separation of concerns**: `AuthService` handles authentication logic; `UserService` handles user lookup and persistence
 - Returns `Optional<UserProfile>` rather than throwing exceptions — callers use `.isEmpty()` / `.isPresent()` for clean control flow
 
@@ -1113,7 +1128,7 @@ public List<WorkloadEntry> buildEntries() {
 - On startup, `AppBootstrapListener` initializes the `AppServices` singleton which creates: `JsonFileStore` → 6 Repositories → 6 Services in dependency order. All services receive their dependencies via constructor injection.
 
 **Authentication** (`AuthService.java`)
-- Accepts username and password, trims whitespace, looks up user by username, and compares passwords. Returns `Optional<UserProfile>` — empty on failure, present on success. (Note: currently plaintext comparison for demo purposes.)
+- Accepts username and password, trims whitespace, looks up user by username, verifies PBKDF2 password hashes with legacy seed-data compatibility, and temporarily locks repeated failed attempts. Returns `Optional<UserProfile>` — empty on failure, present on success.
 
 **Data Structure**: `data/users/` (UserProfile JSON), `data/jobs/` (JobPosting JSON), `data/applications/` (ApplicationRecord JSON), `data/cv/` (uploaded files), `data/system/config.json` (system config), `data/system/id-counters.json` (auto-increment IDs), `logs/access/audit.csv` (audit trail).
 

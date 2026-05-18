@@ -39,10 +39,10 @@
 
 | 指标 | 数量 |
 |------|------|
-| Java 类 | 42 |
+| Java 类 | 45 |
 | JSP 页面 | 8 |
-| Servlet | 16（1个抽象基类 + 15个具体实现） |
-| Service 服务层 | 6 |
+| Servlet | 17（1个抽象基类 + 16个具体实现） |
+| Service 服务层 | 7 |
 | Repository 仓储层 | 6 |
 | 演示用户 | 100+ |
 | 演示岗位 | 50+ |
@@ -114,6 +114,9 @@ mvn -f framework/recruitassist-web/pom.xml \
 - 基于 `HttpSession` 的会话状态管理
 - **会话固定攻击防护**：登录成功后先调用 `session.invalidate()` 销毁旧会话，再调用 `getSession(true)` 创建新会话
 - **用户名枚举防护**：登录失败时统一显示 "Invalid username or password"，不区分是用户名还是密码错误
+- **密码哈希存储**：新注册密码使用 PBKDF2-HMAC-SHA256 保存；旧演示数据中的明文密码仍可兼容读取
+- **失败登录节流**：同一用户名连续 5 次登录失败后，会触发 5 分钟临时锁定
+- **Session 加固**：登录后的会话 30 分钟无操作自动过期；所有 Servlet 响应带基础安全头（`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Cache-Control`）
 - Flash 消息系统用于成功/错误反馈（如 "Signed in as Amelia Chen."）
 - 登录页面提供**演示用户快速选择面板**：最多展示 3 个 TA、2 个 MO、1 个 Admin 账号，点击 "Use account" 按钮自动填充表单
 - **实时统计头部**：显示系统总账号数、TA 数、MO 数、Admin 数
@@ -130,7 +133,7 @@ mvn -f framework/recruitassist-web/pom.xml \
 | 用户名唯一性 | 后端 | `findByUsername()` 数据库查找 |
 | 显示名称唯一性 | 后端 | 遍历所有用户，大小写不敏感比较 |
 | 密码长度 | 前端 + 后端 | HTML5 `minlength=6` + Java `length < 6` 检查 |
-| 密码一致性 | 后端 | `password.equals(confirmPassword)` |
+| 密码一致性 | 后端 | `password.equals(confirmPassword)`，通过后再做 PBKDF2 哈希持久化 |
 | Admin 角色拦截 | 后端 | `role == ADMIN` → 直接拒绝 |
 | 邮箱格式 | 前端 + 后端 | HTML5 `type=email` + Java 正则 |
 | XSS 防护 | 后端 | `cleanText()` 去除 `<>` 标签和控制字符 |
@@ -151,6 +154,11 @@ mvn -f framework/recruitassist-web/pom.xml \
 - **功能展示网格**：三张卡片分别介绍 TA/MO/Admin 工作流
 - **演示路径引导**：3 步骤演示建议（TA → MO → Admin）
 - 已登录用户自动重定向到对应角色的仪表盘
+
+**健康检查** (`/health`)
+- Sprint 4 部署/可用性检查入口
+- 检查必要目录是否存在，并返回实时用户数、岗位数和申请数
+- 文件存储可读时返回 HTTP 200 和 `{"status":"UP"}`；运行时存储检查失败时返回 HTTP 503 和 `{"status":"DOWN"}`
 
 ### 4.2 TA（助教）功能
 
@@ -356,6 +364,13 @@ logs/
 - **原子写入**：先写入临时文件，再原子移动到目标路径
 - **缓存失效**：写操作后自动清除文件缓存；目录缓存按前缀匹配失效
 
+### Sprint 4 并发验证
+
+- `ApplicationService` 对申请提交和状态更新使用写锁串行化处理，重复申请检查与写入处于同一个临界区。
+- `IdCounterRepository` 对计数器读、更新、写入加锁，避免并发创建时生成重复 ID。
+- `ApplicationConcurrencyTest` 同时发起 24 次同一 TA/岗位申请，验证只有 1 次成功，且磁盘上只持久化 1 条 JSON 申请记录。
+- `PasswordHasherTest` 与 `AuthServiceTest` 覆盖 PBKDF2 验证、旧演示密码兼容，以及连续失败登录后的临时锁定。
+
 ---
 
 ## 6. 系统配置
@@ -397,6 +412,7 @@ logs/
 | 方法 | URL | 角色 | 说明 |
 |------|-----|------|------|
 | GET | `/home` | 公开 | 着陆页，展示系统统计 |
+| GET | `/health` | 公开 | 部署健康检查 / 可用性探针 |
 | GET/POST | `/login` | 公开 | 登录表单 / 认证 |
 | GET/POST | `/register` | 公开 | 注册表单 / 创建新账户（仅 TA 和 MO） |
 | GET | `/logout` | 已登录 | 结束会话 |
