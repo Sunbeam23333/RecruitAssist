@@ -40,8 +40,8 @@
 | Metric | Value |
 |--------|-------|
 | Java Classes | 42 |
-| JSP Pages | 7 |
-| Servlets | 14 (1 abstract base + 13 concrete) |
+| JSP Pages | 8 |
+| Servlets | 16 (1 abstract base + 15 concrete) |
 | Services | 6 |
 | Repositories | 6 |
 | Demo Users | 100+ |
@@ -112,18 +112,44 @@ Open http://127.0.0.1:8081/ in your browser.
 **Login** (`/login`)
 - Username + password form-based authentication
 - Session-based state management with `HttpSession`
-- Flash message system for success/error feedback
-- Demo user quick-select panel on login page
-- Session invalidation on logout for security
+- **Session fixation protection**: after a successful login, the old session is invalidated and a fresh session is created before storing the authenticated user ID
+- **Username enumeration protection**: failed login attempts always show the same "Invalid username or password" message
+- Flash message system for success/error feedback (for example, "Signed in as Amelia Chen.")
+- **Demo user quick-select panel**: the login page shows up to 3 TA accounts, 2 MO accounts, and 1 Admin account, and the "Use account" button auto-fills the form
+- **Live account statistics**: total users, TA count, MO count, and Admin count are displayed in the login page header
+- **Sticky form state**: failed login attempts keep the submitted username
+- Authenticated users visiting `/login` are redirected to `/dashboard`
+
+**Registration** (`/register`)
+- New account form with 6 fields: username, display name, email, role (TA or MO), password, and confirm password
+- **Multi-layer validation**:
+
+| Check | Layer | Implementation |
+|-------|-------|----------------|
+| Username format | Client + Server | HTML5 `pattern="[a-zA-Z0-9._-]{3,30}"` + Java regex |
+| Username uniqueness | Server | `findByUsername()` lookup |
+| Display name uniqueness | Server | Case-insensitive scan of existing user display names |
+| Password length | Client + Server | HTML5 `minlength=6` + Java length check |
+| Password confirmation | Server | `password.equals(confirmPassword)` |
+| Admin role block | Server | `role == ADMIN` is rejected |
+| Email format | Client + Server | HTML5 `type=email` + Java regex |
+| XSS prevention | Server | `cleanText()` strips angle brackets and control characters |
+
+- **Admin self-registration is blocked**: only TA and MO roles are exposed in the form, and tampered `role=ADMIN` requests are rejected server-side
+- **Sticky form fields**: validation failures preserve username, display name, email, and selected role
+- Successful registration sets a flash message and redirects the user to `/login`
 
 **Logout** (`/logout`)
-- Invalidates current session
-- Creates new session with "Logged out" flash message
+- Invalidates the current session completely
+- Creates a new session with "You have been signed out." flash message
 - Redirects to login page
 
 **Home Page** (`/home`)
-- Public landing page for unauthenticated users
-- Displays system statistics: total TAs, MOs, Admins, jobs, applications
+- Public landing page for unauthenticated users with a modern hero layout
+- Displays 5 live system statistics: total TAs, MOs, Admins, jobs, and applications
+- Provides one-click Quick Sign-In cards for representative TA, MO, and Admin accounts
+- Shows feature cards for the TA, MO, and Admin workflows
+- Includes a suggested 3-step demo path for presentations
 - Authenticated users are automatically redirected to their dashboard
 
 ### 4.2 TA Features
@@ -375,6 +401,7 @@ logs/
 |--------|-----|------|-------------|
 | GET | `/home` | Public | Landing page with system stats |
 | GET/POST | `/login` | Public | Login form / authenticate |
+| GET/POST | `/register` | Public | Registration form / create TA or MO account |
 | GET | `/logout` | Authenticated | End session |
 | GET | `/dashboard` | Authenticated | Role-specific dashboard |
 | GET | `/jobs/detail?id={jobId}` | Authenticated | Job detail with role-specific view |

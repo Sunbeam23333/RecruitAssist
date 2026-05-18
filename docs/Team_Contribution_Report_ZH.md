@@ -8,7 +8,7 @@
 
 | 成员 | 主要职责 | 核心文件 | 代码量（约） |
 |------|---------|---------|------------|
-| Yi Qi | 登录与首页与 UI | 7 个文件 | ~500 行 |
+| Yi Qi | 登录、注册、首页与 UI | 12 个文件 | ~900 行 |
 | Tianyu Zhao | TA 仪表盘与简历与申请 | 8 个文件 | ~700 行 |
 | Jie Ren | MO 仪表盘与岗位 CRUD | 6 个文件 | ~700 行 |
 | Haopeng Jin | 推荐引擎与申请服务 | 7 个文件 | ~1,500 行 |
@@ -19,34 +19,61 @@
 
 ## 2. 各成员贡献详情
 
-### 2.1 Yi Qi — 登录与首页与 UI 资产
+### 2.1 Yi Qi — 登录、注册、首页与 UI 资产
 
-**负责文件**: `LoginServlet.java`, `LogoutServlet.java`, `HomeServlet.java`, `login.jsp`, `home.jsp`, `index.jsp`, README 与架构图
+**负责文件**:
+- `LoginServlet.java`, `LogoutServlet.java`, `HomeServlet.java`, `RegisterServlet.java`
+- `AuthService.java`（认证逻辑）
+- `UserService.java` — `registerUser()` 方法（注册校验与持久化）
+- `login.jsp`, `register.jsp`, `home.jsp`, `index.jsp`
+- README、中文 README 与架构图
 
-**对应 Backlog**: #1 用户登录与角色访问, #13 响应式 UI
+**对应 Backlog**: #1 用户登录与角色访问, #12 用户注册与认证, #13 响应式 UI
 
 #### 功能介绍（演示说明）
 
 **登录页面** (`/login`)
-- 基于用户名 + 密码的表单认证，使用 HttpSession 管理会话状态
-- 登录页面展示**演示用户快速选择面板**，按角色分组显示最多 3 个 TA、2 个 MO、1 个 Admin 账号，方便快速登录
-- 登录成功后先销毁旧会话再创建新会话（防止会话固定攻击）
-- Flash 消息系统显示成功/错误反馈（如 "Welcome back, Alice!"）
-- 登录失败仅显示通用错误 "Invalid username or password"，不暴露具体是用户名还是密码错误
+- 基于用户名 + 密码的表单认证，使用 `HttpSession` 管理会话状态
+- 登录页面展示**演示用户快速选择面板**：最多 3 个 TA、2 个 MO、1 个 Admin 账号，每个账号带 "Use account" 按钮，可通过前端 `data-fill-login` 自动填充表单
+- 登录页顶部显示**实时账号统计**：总账号数、TA 数、MO 数、Admin 数，便于 demo 时说明数据规模
+- 登录成功后显式销毁旧会话并创建新会话，防止会话固定攻击
+- Flash 消息系统显示成功/错误反馈（如 "Signed in as Amelia Chen."）
+- 登录失败仅显示通用错误 "Invalid username or password"，不暴露具体是用户名还是密码错误，降低用户名枚举风险
+- 登录失败后保留已输入用户名，提升表单体验；已登录用户访问 `/login` 会自动跳转到 `/dashboard`
+
+**注册页面** (`/register`)
+- 新用户注册表单包含 6 个字段：用户名、显示名称、邮箱、角色（TA/MO）、密码、确认密码
+- **Admin 注册封锁**：页面只提供 TA 和 MO 角色；即使用户篡改请求提交 `role=ADMIN`，后端也会拒绝
+- **用户名校验**：3-30 位，只允许字母、数字、点、下划线和连字符；保存前统一转小写并检查唯一性
+- **显示名称唯一性校验**：对现有用户名称做大小写不敏感比较，避免 demo 中出现重复展示名
+- **邮箱与密码校验**：邮箱格式前后端双层校验；密码至少 6 位，并要求与确认密码一致
+- **输入清洗与 XSS 防护**：通过 `cleanText()` 去除 `< >` 和控制字符，并限制字段最大长度
+- **粘性表单**：注册失败后保留用户名、姓名、邮箱和已选角色，用户无需重新填写
+- 注册成功后写入 Flash 消息并跳转登录页，引导用户用新账号登录
 
 **登出** (`/logout`)
-- 销毁当前会话，创建新会话并写入"已登出"提示，重定向到登录页
+- 调用 `session.invalidate()` 清理当前会话，重新创建只携带提示信息的新会话，并重定向到登录页
+- 避免登出后残留 `userId`、Flash 或其他 Session 属性
 
 **首页** (`/home`)
-- 未登录用户的公开着陆页
-- 实时展示系统统计数据：TA 总数、MO 总数、Admin 总数、岗位数、申请数
+- 未登录用户的公开着陆页，采用 Hero 区域 + 功能卡片的展示结构
+- 实时展示 5 类系统统计数据：TA 总数、MO 总数、Admin 总数、岗位数、申请数
+- 提供 TA/MO/Admin 三种角色的一键快速登录卡片，方便课堂演示和角色切换
+- 通过功能展示卡说明 TA 推荐、MO 岗位管理、Admin 工作量监控三条核心路径
+- 提供 3 步 demo 路线建议：TA 视角 → MO 视角 → Admin 视角
 - 已登录用户自动重定向到对应角色的仪表盘
 
-**演示路径**：打开应用 → 看到首页的系统统计 → 点击登录 → 用快选面板选择 `alice.ta` → 输入密码 `demo123` → 跳转到 TA 仪表盘并显示欢迎提示。
+**认证服务** (`AuthService.java`)
+- 接收用户名和密码，先进行空值与空白输入检查
+- 调用 `UserService.findByUsername()` 查询用户，并用 `String.equals()` 比对密码
+- 返回 `Optional<UserProfile>`，失败时为空，Servlet 层据此决定转发回登录页或进入仪表盘
+- 认证逻辑与 Servlet 展示逻辑分离，便于测试和复用
+
+**演示路径**：打开应用 → 查看首页统计和功能卡片 → 点击 "Open demo login" → 在登录页查看账号统计与快选表格 → 点击 `alice.ta` 的 "Use account" 自动填充 → 登录进入 TA 仪表盘；也可以点击注册入口创建新的 TA/MO 账号并回到登录页验证。
 
 #### 核心实现
 
-**登录认证流程** — `LoginServlet.java` 第31-53行
+**1. 登录认证与会话安全** — `LoginServlet.java`
 
 ```java
 protected void doPost(HttpServletRequest req, HttpServletResponse resp)
@@ -70,9 +97,37 @@ protected void doPost(HttpServletRequest req, HttpServletResponse resp)
 }
 ```
 
-**演示用户快选面板** — `LoginServlet.java` 第55-68行：按角色分组（最多3个TA + 2个MO + 1个Admin）展示在登录页。
+关键点：
+- 成功登录前先销毁旧 Session，再创建新 Session 存储 `userId`
+- 失败时统一返回通用错误，不泄露账号是否存在
+- 失败后保留用户名，并重新填充 demo 用户、账号统计等页面数据
 
-**首页统计** — `HomeServlet.java` 第22-53行：展示 TA/MO/Admin 人数、岗位数、申请数。
+**2. 注册多层校验** — `RegisterServlet.java` + `UserService.registerUser()`
+
+```java
+ActionResult result = services(req).userService().registerUser(
+        username, password, confirmPassword, role, name, email,
+        services(req).idCounterRepository());
+if (!result.isSuccess()) {
+    req.setAttribute("error", result.getMessage());
+    req.setAttribute("username", username);
+    req.setAttribute("name", name);
+    req.setAttribute("email", email);
+    req.setAttribute("selectedRole", role);
+    req.getRequestDispatcher("/WEB-INF/jsp/register.jsp").forward(req, resp);
+    return;
+}
+```
+
+验证链覆盖用户名格式、用户名唯一性、显示名称唯一性、密码长度、密码确认、Admin 注册封锁、邮箱格式和文本清洗。成功后通过 `IdCounterRepository` 生成新用户 ID，并写入 `data/users/{userId}.json`。
+
+**3. 演示用户快选面板** — `LoginServlet.java`
+
+`populateLoginView()` 从用户仓储读取全部账号，组合 3 个 TA、2 个 MO、1 个 Admin 作为演示账号，同时向 JSP 注入 `demoPassword`、`totalUserCount`、`taCount`、`moCount` 和 `adminCount`，由 `login.jsp` 与 `app.js` 完成自动填表。
+
+**4. 首页统计与快速登录** — `HomeServlet.java`
+
+`HomeServlet` 每次请求实时统计 TA/MO/Admin 数量、岗位数和申请数，并为首页 Quick Sign-In 卡片挑选代表账号，确保首页展示内容跟当前 JSON 数据保持一致。
 
 ---
 
@@ -466,7 +521,7 @@ public void write(Path file, Object value) {
 | 9 | TA 查看申请状态 | ✅ 完成 | Tianyu Zhao |
 | 10 | Admin 总览仪表盘 | ✅ 完成 | Zhuang Hou |
 | 11 | JSON 数据持久化层 | ✅ 完成 | Zexuan Dong |
-| 12 | 用户注册与认证 | ✅ 完成 | Zexuan Dong |
+| 12 | 用户注册与认证 | ✅ 完成 | Yi Qi（RegisterServlet、AuthService）+ Zexuan Dong（基础设施） |
 | 13 | 响应式一致 UI | ✅ 完成 | Yi Qi + Tianyu Zhao |
 | 14 | TA 岗位搜索过滤 | ✅ 完成 | Zhuang Hou |
 | 15 | Admin 历史记录 | ✅ 完成 | Zhuang Hou |
