@@ -28,7 +28,7 @@
 | Yi Qi | Login & Registration & Homepage & UI | 12 files | ~900 |
 | Tianyu Zhao | TA Dashboard & CV & Apply | 8 files | ~700 |
 | Jie Ren | MO Dashboard & Job CRUD | 6 files | ~700 |
-| Haopeng Jin | Recommendation Engine & Application | 7 files | ~1,500 |
+| Haopeng Jin | Recommendation Engine, Application, Sprint 4 Security & Availability | 14 files | ~2,100 |
 | Zhuang Hou | Admin Dashboard & Workload | 6 files | ~500 |
 | Zexuan Dong | Data Layer & Infrastructure | 15 files | ~1,200 |
 
@@ -702,11 +702,14 @@ This ensures that expired or fully-filled jobs are automatically closed when the
 
 ---
 
-### 2.4 Haopeng Jin — Recommendation Engine & Application Service & Search/Filter
+### 2.4 Haopeng Jin — Recommendation Engine & Application Service & Sprint 4 Security/Availability
 
 **Responsible Files**:
 - `RecommendationService.java` (626 lines — the most complex service)
 - `ApplicationService.java` (415 lines)
+- `AppServlet.java`, `LogoutServlet.java`, `UserService.java`
+- `JsonFileStore.java`, `IdCounterRepository.java`
+- `HealthServlet.java`, `PasswordHasher.java`
 - `JobDetailServlet.java`, `UpdateApplicationStatusServlet.java`
 - `DashboardServlet.java` (search/filter logic for all 3 roles)
 - `JobRecommendation.java` (view model)
@@ -714,9 +717,17 @@ This ensures that expired or fully-filled jobs are automatically closed when the
 - `DownloadCvServlet.java` (friendly filename generation)
 - `data/applications/` (seed data)
 
-**Backlog Stories**: #4 Browse Positions, #8 Accept/Reject, #14 Job Search & Filter, #19 AI Skill Matching
+**Backlog Stories**: #4 Browse Positions, #8 Accept/Reject, #14 Job Search & Filter, #19 AI Skill Matching, Sprint 4 Security & High Availability Hardening
 
 #### Feature Description (for Demo Presentation)
+
+**Sprint 4 Security & High Availability Hardening**:
+- Added system-wide CSRF protection in `AppServlet`: every POST form carries a session token, and missing/mismatched tokens are rejected with HTTP 403.
+- Converted logout from GET to POST, so a crawler, preview, or malicious image/link cannot trigger a sign-out state change.
+- Added a synchronized registration critical section in `UserService.registerUser()` so username uniqueness checks and user creation stay atomic under concurrent attempts.
+- Hardened file-backed persistence in `JsonFileStore`: JSON/CSV writes now acquire a sibling `.lock` file through `FileChannel.lock()`, failed writes clean up temp files, and corrupted JSON files are skipped during directory listing instead of breaking the whole page.
+- Wrapped `IdCounterRepository` counter updates in a cross-process file lock, reducing duplicate-ID risk when multiple local server processes share the same `data/` directory.
+- Kept `/health` as a readiness endpoint so deployment and load-balancing experiments can check whether file-backed storage is readable before routing traffic.
 
 **Cross-Role Search & Filter System** (added in v3.0.3)
 

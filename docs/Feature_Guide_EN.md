@@ -39,11 +39,11 @@
 
 | Metric | Value |
 |--------|-------|
-| Java Classes | 45 |
+| Java Classes | 50 |
 | JSP Pages | 8 |
-| Servlets | 17 (1 abstract base + 16 concrete) |
-| Services | 7 |
-| Repositories | 6 |
+| Servlets | 19 (1 abstract base + 18 concrete) |
+| Services | 8 |
+| Repositories | 7 |
 | Demo Users | 100+ |
 | Demo Jobs | 50+ |
 | Demo Applications | 500+ |
@@ -116,6 +116,7 @@ Open http://127.0.0.1:8081/ in your browser.
 - **Username enumeration protection**: failed login attempts always show the same "Invalid username or password" message
 - **Password hashing**: newly registered passwords are stored with PBKDF2-HMAC-SHA256; legacy demo plaintext passwords remain readable for backwards-compatible seed data
 - **Failed login throttling**: five consecutive failed attempts for the same username key trigger a temporary 5-minute lockout
+- **CSRF protection**: all POST forms include a session token and `AppServlet` rejects invalid or missing tokens with HTTP 403
 - **Session hardening**: authenticated sessions expire after 30 minutes of inactivity and all Servlet responses include baseline security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Cache-Control`)
 - Flash message system for success/error feedback (for example, "Signed in as Amelia Chen.")
 - **Demo user quick-select panel**: the login page shows up to 3 TA accounts, 2 MO accounts, and 1 Admin account, and the "Use account" button auto-fills the form
@@ -141,11 +142,12 @@ Open http://127.0.0.1:8081/ in your browser.
 - **Admin self-registration is blocked**: only TA and MO roles are exposed in the form, and tampered `role=ADMIN` requests are rejected server-side
 - **Sticky form fields**: validation failures preserve username, display name, email, and selected role
 - Successful registration sets a flash message and redirects the user to `/login`
+- `UserService.registerUser()` is synchronized so username uniqueness checks and user creation remain atomic under concurrent registration attempts
 
 **Logout** (`/logout`)
 - Invalidates the current session completely
 - Creates a new session with "You have been signed out." flash message
-- Redirects to login page
+- Uses POST + CSRF token instead of GET, then redirects to the login page
 
 **Home Page** (`/home`)
 - Public landing page for unauthenticated users with a modern hero layout
@@ -171,6 +173,7 @@ The TA Dashboard provides a comprehensive workspace:
 - **Profile Management Form**: Edit name, student ID, email, programme, skills, availability, experience, CV text
 - **CV Upload**: Support for PDF, DOC, DOCX, TXT (max 5MB)
 - **Application History**: Table showing all applications with status, score, and timestamp
+- **Application Notifications**: Shows status-change notifications from MOs with unread count and "mark as read" action
 - **Recommended Jobs Grid**: Searchable/sortable list of job cards with:
   - Overall match percentage and fit label
   - Matched/missing skill tags
@@ -198,7 +201,13 @@ The TA Dashboard provides a comprehensive workspace:
 - Audit log entry is created
 - User can re-apply after withdrawal
 
-#### 4.2.4 Profile Management (`/profile/update`)
+#### 4.2.4 Application Notifications (`/notifications/read`)
+
+- Created automatically when an MO changes an application to SHORTLISTED, ACCEPTED, or REJECTED
+- TA dashboard shows recent notifications and unread count
+- TA can mark notifications as read; only the notification recipient can update read state
+
+#### 4.2.5 Profile Management (`/profile/update`)
 
 Editable fields:
 - Name, Student ID, Email (validated format)
@@ -206,7 +215,7 @@ Editable fields:
 - Availability text, Experience text, CV text
 - Input sanitisation: strips HTML tags, control characters, enforces max length
 
-#### 4.2.5 CV Upload (`/profile/cv/upload`)
+#### 4.2.6 CV Upload (`/profile/cv/upload`)
 
 - Supported formats: PDF, DOC, DOCX, TXT
 - Max file size: 5MB
@@ -266,6 +275,8 @@ Status transitions available to MO:
 
 **Auto-close**: When the last available quota slot is filled by an ACCEPTED application, the job automatically closes.
 
+**Notifications**: Successful status changes create a TA-facing notification so applicants can see shortlist/accept/reject outcomes without manually opening every application.
+
 #### 4.3.6 Download CV (`/cv/download`)
 
 Access control:
@@ -285,6 +296,16 @@ Access control:
   - Accepted hours, active applications
   - "Balanced" / "Over threshold" indicator
 - **Recent Applications**: Latest 10 applications across the system
+- **CSV Export**: Download jobs, applications, or workload reports as dated CSV files
+
+#### 4.4.2 CSV Export (`/admin/export`)
+
+- Admin-only endpoint
+- Export types:
+  - `type=jobs`: job ID, module, title, owner, deadline, status, quota, workload, application count, accepted count
+  - `type=applications`: application ID, job, module, applicant, status, recommendation percentage, submitted time
+  - `type=workload`: TA user ID, name, programme, accepted hours, active applications, threshold, status
+- Files are returned with `Content-Disposition: attachment` and date-stamped names
 
 ### 4.5 Recommendation Engine
 
@@ -350,6 +371,7 @@ data/
 ├── users/          # UserProfile JSON files (U*.json)
 ├── jobs/           # JobPosting JSON files (J*.json)
 ├── applications/   # ApplicationRecord JSON files (A*.json)
+├── notifications/  # TA notification JSON files (N*.json)
 ├── cv/             # Uploaded CV files ({userId}_cv.{ext})
 └── system/
     ├── config.json       # System configuration (weights, thresholds)
@@ -365,14 +387,18 @@ logs/
 - **Two-level cache**: File-level cache (keyed by path + modifiedAt + size) and directory-level cache
 - **Path-level read-write locks**: `ConcurrentHashMap<Path, ReentrantReadWriteLock>` for fine-grained concurrency
 - **Atomic writes**: Data written to temp file first, then atomically moved to target path
+- **Cross-process write locks**: writes acquire a sibling `.lock` file through `FileChannel.lock()` so two Tomcat instances do not write the same JSON/CSV file at the same time
+- **Failure cleanup and resilience**: failed writes delete temporary files on a best-effort basis; directory reads skip corrupted JSON files instead of failing the whole listing
 - **Cache invalidation**: Automatic on write operations; directory cache invalidated by prefix matching
 
 ### Sprint 4 Concurrency Evidence
 
 - `ApplicationService` serialises application submission and status updates with a write lock, so duplicate active applications are checked and written as one critical section.
-- `IdCounterRepository` uses a lock around counter read/update/write, preventing duplicated IDs under concurrent creation.
+- `IdCounterRepository` uses an in-JVM lock and a cross-process file lock around counter read/update/write, preventing duplicated IDs under concurrent creation.
 - `ApplicationConcurrencyTest` launches 24 simultaneous submissions for the same TA/job pair and verifies that exactly one succeeds and exactly one JSON application record is persisted.
 - `PasswordHasherTest` and `AuthServiceTest` cover PBKDF2 verification, legacy demo password compatibility, and temporary lockout after repeated login failures.
+- `NotificationServiceTest` verifies that MO status updates create unread TA notifications and that read-state updates are owner-only.
+- JaCoCo coverage is generated during `mvn verify` under `framework/recruitassist-web/target/site/jacoco/`.
 
 ---
 
@@ -427,6 +453,8 @@ logs/
 | POST | `/apply` | TA | Submit application |
 | POST | `/applications/withdraw` | TA | Withdraw application |
 | POST | `/applications/status` | MO | Accept/reject/shortlist application |
+| POST | `/notifications/read` | TA | Mark notification as read |
+| GET | `/admin/export?type={jobs|applications|workload}` | Admin | Download CSV report |
 | POST | `/profile/update` | TA | Update personal profile |
 | POST | `/profile/cv/upload` | TA | Upload CV file |
 | GET | `/cv/download?userId={id}` | Auth+ACL | Download CV file |

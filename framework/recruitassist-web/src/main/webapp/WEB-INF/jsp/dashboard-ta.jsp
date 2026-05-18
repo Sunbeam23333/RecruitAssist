@@ -20,6 +20,7 @@
                 <div class="hero-metric"><strong>${currentWorkload}/${workloadThreshold} h</strong><span>Current accepted workload</span></div>
                 <div class="hero-metric"><strong>${activeApplicationCount}</strong><span>Active applications</span></div>
                 <div class="hero-metric"><strong>${profileSignalPercent}%</strong><span>Profile evidence readiness</span></div>
+                <div class="hero-metric"><strong>${unreadNotificationCount}</strong><span>Unread notifications</span></div>
             </div>
         </div>
         <c:choose>
@@ -36,7 +37,10 @@
                     </div>
                     <div class="action-row">
                         <a class="secondary-button small-button" href="${pageContext.request.contextPath}/jobs/detail?jobId=${topRecommendation.job.jobId}">Open top job</a>
-                        <a class="secondary-button small-button" href="${pageContext.request.contextPath}/logout">Log out</a>
+                        <form class="inline-form inline-form-tight" method="post" action="${pageContext.request.contextPath}/logout">
+                            <input type="hidden" name="csrfToken" value="${csrfToken}" />
+                            <button class="secondary-button small-button" type="submit">Log out</button>
+                        </form>
                     </div>
                 </aside>
             </c:when>
@@ -47,7 +51,10 @@
                     <h3>Nothing to apply for right now</h3>
                     <p class="muted-copy">Once more roles are published, this panel will highlight the best opportunity based on your profile evidence and workload balance.</p>
                     <div class="action-row">
-                        <a class="secondary-button small-button" href="${pageContext.request.contextPath}/logout">Log out</a>
+                        <form class="inline-form inline-form-tight" method="post" action="${pageContext.request.contextPath}/logout">
+                            <input type="hidden" name="csrfToken" value="${csrfToken}" />
+                            <button class="secondary-button small-button" type="submit">Log out</button>
+                        </form>
                     </div>
                 </aside>
             </c:otherwise>
@@ -79,6 +86,44 @@
             <strong><c:choose><c:when test="${profileReady}">Ready</c:when><c:otherwise>Needs update</c:otherwise></c:choose></strong>
             <p>Applications work best when skills, availability, experience and CV evidence are up to date.</p>
         </article>
+    </section>
+
+    <section class="panel section-gap">
+        <div class="section-head">
+            <div>
+                <h2>Application notifications</h2>
+                <p class="muted-copy">Status updates from module organisers appear here so you do not need to manually inspect every application.</p>
+            </div>
+            <span class="metric-pill">${unreadNotificationCount} unread</span>
+        </div>
+        <div class="notification-list">
+            <c:forEach var="notification" items="${notifications}">
+                <article class="surface-note">
+                    <div class="section-head compact-head">
+                        <div>
+                            <strong>${notification.title}</strong>
+                            <p class="muted-copy">${notification.message}</p>
+                            <p class="muted-copy">${notification.createdAtLabel}</p>
+                        </div>
+                        <c:choose>
+                            <c:when test="${notification.read}">
+                                <span class="status-pill status-accepted">Read</span>
+                            </c:when>
+                            <c:otherwise>
+                                <form class="inline-form inline-form-tight" method="post" action="${pageContext.request.contextPath}/notifications/read">
+                                    <input type="hidden" name="csrfToken" value="${csrfToken}" />
+                                    <input type="hidden" name="notificationId" value="${notification.notificationId}" />
+                                    <button class="secondary-button small-button" type="submit" data-loading-text="Marking...">Mark as read</button>
+                                </form>
+                            </c:otherwise>
+                        </c:choose>
+                    </div>
+                </article>
+            </c:forEach>
+            <c:if test="${empty notifications}">
+                <div class="empty-state">No status notifications yet.</div>
+            </c:if>
+        </div>
     </section>
 
     <!-- ===== RECOMMENDED JOBS (primary content — shown first) ===== -->
@@ -204,6 +249,7 @@
                             </c:when>
                             <c:otherwise>
                                 <form class="inline-form inline-form-tight" method="post" action="${pageContext.request.contextPath}/apply">
+                                    <input type="hidden" name="csrfToken" value="${csrfToken}" />
                                     <input type="hidden" name="jobId" value="${recommendation.job.jobId}" />
                                     <button class="primary-button small-button" type="submit" data-loading-text="Submitting application...">Apply now</button>
                                 </form>
@@ -239,6 +285,7 @@
                             <c:choose>
                                 <c:when test="${application.status.code != 'WITHDRAWN' and application.status.code != 'REJECTED'}">
                                     <form class="inline-form inline-form-tight" method="post" action="${pageContext.request.contextPath}/applications/withdraw">
+                                        <input type="hidden" name="csrfToken" value="${csrfToken}" />
                                         <input type="hidden" name="applicationId" value="${application.applicationId}" />
                                         <input type="hidden" name="jobId" value="${application.jobId}" />
                                         <button class="secondary-button small-button" type="submit" data-loading-text="Withdrawing...">Withdraw</button>
@@ -262,6 +309,7 @@
             <span class="status-pill status-ta"><c:choose><c:when test="${profileReady}">Profile ready</c:when><c:otherwise>Update required</c:otherwise></c:choose></span>
         </div>
         <form class="form-grid two-column-form section-gap" method="post" action="${pageContext.request.contextPath}/profile/update">
+            <input type="hidden" name="csrfToken" value="${csrfToken}" />
             <label class="field-group"><span>Full name</span><input class="input" type="text" name="name" value="${user.name}" required /></label>
             <label class="field-group"><span>Student ID</span><input class="input" type="text" name="studentId" value="${user.studentId}" required /></label>
             <label class="field-group"><span>Email</span><input class="input" type="email" name="email" value="${user.email}" /></label>
@@ -273,6 +321,7 @@
             <div class="form-actions full-width"><button class="primary-button" type="submit" data-loading-text="Saving...">Save profile</button></div>
         </form>
         <form class="form-grid section-gap" method="post" action="${pageContext.request.contextPath}/profile/cv/upload" enctype="multipart/form-data">
+            <input type="hidden" name="csrfToken" value="${csrfToken}" />
             <label class="upload-zone" data-upload-zone>
                 <span class="upload-zone-title">Upload CV file</span>
                 <span class="upload-zone-hint" data-upload-filename>Drop file here or choose from device</span>

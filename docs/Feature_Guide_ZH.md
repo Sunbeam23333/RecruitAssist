@@ -39,11 +39,11 @@
 
 | 指标 | 数量 |
 |------|------|
-| Java 类 | 45 |
+| Java 类 | 50 |
 | JSP 页面 | 8 |
-| Servlet | 17（1个抽象基类 + 16个具体实现） |
-| Service 服务层 | 7 |
-| Repository 仓储层 | 6 |
+| Servlet | 19（1个抽象基类 + 18个具体实现） |
+| Service 服务层 | 8 |
+| Repository 仓储层 | 7 |
 | 演示用户 | 100+ |
 | 演示岗位 | 50+ |
 | 演示申请 | 500+ |
@@ -116,6 +116,7 @@ mvn -f framework/recruitassist-web/pom.xml \
 - **用户名枚举防护**：登录失败时统一显示 "Invalid username or password"，不区分是用户名还是密码错误
 - **密码哈希存储**：新注册密码使用 PBKDF2-HMAC-SHA256 保存；旧演示数据中的明文密码仍可兼容读取
 - **失败登录节流**：同一用户名连续 5 次登录失败后，会触发 5 分钟临时锁定
+- **CSRF 防护**：所有 POST 表单都带会话 token，`AppServlet` 会对缺失或错误 token 返回 HTTP 403
 - **Session 加固**：登录后的会话 30 分钟无操作自动过期；所有 Servlet 响应带基础安全头（`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Cache-Control`）
 - Flash 消息系统用于成功/错误反馈（如 "Signed in as Amelia Chen."）
 - 登录页面提供**演示用户快速选择面板**：最多展示 3 个 TA、2 个 MO、1 个 Admin 账号，点击 "Use account" 按钮自动填充表单
@@ -141,11 +142,12 @@ mvn -f framework/recruitassist-web/pom.xml \
 - **Admin 注册封锁**：角色下拉菜单仅提供 TA 和 MO 选项；即使通过请求篡改提交 `role=ADMIN`，服务端也会返回明确错误
 - **粘性表单**：验证失败后保留所有已输入字段（用户名、姓名、邮箱、已选角色），用户无需重新填写
 - 注册成功后设置 Flash 消息（"Account created successfully!"），重定向到登录页
+- `UserService.registerUser()` 使用同步临界区，保证并发注册时“用户名唯一性检查 + 用户创建”是原子操作
 
 **登出** (`/logout`)
 - 调用 `session.invalidate()` 彻底销毁当前会话的所有数据
 - 创建新会话并写入 "You have been signed out." 提示
-- 重定向到登录页
+- 使用 POST + CSRF token，避免 GET 链接触发状态变更，然后重定向到登录页
 
 **首页** (`/home`)
 - 未登录用户的公开着陆页，采用现代化 Hero 布局
@@ -171,6 +173,7 @@ TA 仪表盘提供全方位的工作台：
 - **Profile 管理表单**：编辑姓名、学号、邮箱、专业、技能、可用时间、经验、CV 文本
 - **CV 上传**：支持 PDF、DOC、DOCX、TXT（最大 5MB）
 - **申请历史表格**：展示所有申请的状态、评分和时间戳
+- **申请通知列表**：展示 MO 状态变更通知、未读数量，并支持标记已读
 - **推荐岗位网格**：可搜索/排序的岗位卡片列表，包含：
   - 综合匹配百分比和适配标签
   - 匹配/缺失技能标签
@@ -197,7 +200,13 @@ TA 仪表盘提供全方位的工作台：
 - 状态设为 WITHDRAWN
 - 撤回后可以重新申请该岗位
 
-#### 4.2.4 Profile 管理（`/profile/update`）
+#### 4.2.4 申请通知（`/notifications/read`）
+
+- 当 MO 将申请状态更新为 SHORTLISTED、ACCEPTED 或 REJECTED 时自动创建通知
+- TA 仪表盘展示最近通知和未读数量
+- TA 可以将自己的通知标记为已读；服务端会校验只能操作本人通知
+
+#### 4.2.5 Profile 管理（`/profile/update`）
 
 可编辑字段：
 - 姓名、学号、邮箱（格式验证）
@@ -205,7 +214,7 @@ TA 仪表盘提供全方位的工作台：
 - 可用时间、经验描述、CV 文本
 - 输入清理：自动去除 HTML 标签、控制字符，限制最大长度
 
-#### 4.2.5 CV 上传（`/profile/cv/upload`）
+#### 4.2.6 CV 上传（`/profile/cv/upload`）
 
 - 支持格式：PDF、DOC、DOCX、TXT
 - 最大文件大小：5MB
@@ -265,6 +274,8 @@ MO 可执行的状态转换：
 
 **自动关闭**：当最后一个配额名额被 ACCEPTED 填满时，岗位自动关闭。
 
+**状态通知**：状态更新成功后会为 TA 创建站内通知，TA 可在仪表盘查看入围/接受/拒绝结果。
+
 #### 4.3.6 下载 CV（`/cv/download`）
 
 访问控制：
@@ -284,6 +295,16 @@ MO 可执行的状态转换：
   - 已接受工时、活跃申请数
   - "均衡" / "超出阈值" 指示器
 - **最新申请列表**：系统范围内最新的 10 条申请记录
+- **CSV 导出**：可下载岗位、申请或工作量 CSV 报表
+
+#### 4.4.2 CSV 导出（`/admin/export`）
+
+- 仅 Admin 可访问
+- 导出类型：
+  - `type=jobs`：岗位 ID、模块、标题、负责人、截止日期、状态、配额、工时、申请数、已接受数
+  - `type=applications`：申请 ID、岗位、模块、申请人、状态、推荐百分比、提交时间
+  - `type=workload`：TA 用户 ID、姓名、专业、已接受工时、活跃申请数、阈值、状态
+- 通过 `Content-Disposition: attachment` 返回带日期的 CSV 文件名
 
 ### 4.5 推荐引擎
 
@@ -347,6 +368,7 @@ data/
 ├── users/          # 用户 Profile JSON (U*.json)
 ├── jobs/           # 岗位 JSON (J*.json)
 ├── applications/   # 申请记录 JSON (A*.json)
+├── notifications/  # TA 站内通知 JSON (N*.json)
 ├── cv/             # 上传的 CV 文件 ({userId}_cv.{ext})
 └── system/
     ├── config.json       # 系统配置（权重、阈值）
@@ -362,14 +384,18 @@ logs/
 - **两级缓存**：文件级缓存（key = 路径 + 修改时间 + 大小）和目录级缓存
 - **路径级读写锁**：`ConcurrentHashMap<Path, ReentrantReadWriteLock>` 实现细粒度并发控制
 - **原子写入**：先写入临时文件，再原子移动到目标路径
+- **跨进程写锁**：写入 JSON/CSV 前通过同级 `.lock` 文件和 `FileChannel.lock()` 串行化，降低多 Tomcat 实例同时写同一文件的风险
+- **失败清理与容错**：写入失败时尽力删除临时文件；目录读取遇到坏 JSON 会跳过该文件，避免一个损坏文件拖垮整个列表
 - **缓存失效**：写操作后自动清除文件缓存；目录缓存按前缀匹配失效
 
 ### Sprint 4 并发验证
 
 - `ApplicationService` 对申请提交和状态更新使用写锁串行化处理，重复申请检查与写入处于同一个临界区。
-- `IdCounterRepository` 对计数器读、更新、写入加锁，避免并发创建时生成重复 ID。
+- `IdCounterRepository` 对计数器读、更新、写入同时使用 JVM 内锁和跨进程文件锁，避免并发创建时生成重复 ID。
 - `ApplicationConcurrencyTest` 同时发起 24 次同一 TA/岗位申请，验证只有 1 次成功，且磁盘上只持久化 1 条 JSON 申请记录。
 - `PasswordHasherTest` 与 `AuthServiceTest` 覆盖 PBKDF2 验证、旧演示密码兼容，以及连续失败登录后的临时锁定。
+- `NotificationServiceTest` 验证 MO 状态更新会创建 TA 未读通知，并验证已读状态只能由通知本人更新。
+- `mvn verify` 会生成 JaCoCo 覆盖率报告，位置为 `framework/recruitassist-web/target/site/jacoco/`。
 
 ---
 
@@ -424,6 +450,8 @@ logs/
 | POST | `/apply` | TA | 提交申请 |
 | POST | `/applications/withdraw` | TA | 撤回申请 |
 | POST | `/applications/status` | MO | 接受/拒绝/入围申请 |
+| POST | `/notifications/read` | TA | 标记通知为已读 |
+| GET | `/admin/export?type={jobs|applications|workload}` | Admin | 下载 CSV 报表 |
 | POST | `/profile/update` | TA | 更新个人 Profile |
 | POST | `/profile/cv/upload` | TA | 上传 CV 文件 |
 | GET | `/cv/download?userId={id}` | 认证+ACL | 下载 CV 文件 |

@@ -4,6 +4,7 @@ framework/recruitassist-web/target/
 .codebuddy/
 __pycache__/
 *.py
+!scripts/load_test_recruitassist.py
 *.pyc
 *.pdf
 EBU6304_GroupProjectHandout_extracted.txt
@@ -15,3 +16,5 @@ git.log
 homework/Group38-TA_Recruitment/
 homework/recruitassist-web-sprint1/.idea/
 figure/system-architecture_*.png
+# Runtime file locks
+*.lock

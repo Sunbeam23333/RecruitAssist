@@ -11,7 +11,7 @@
 | Yi Qi | 登录、注册、首页与 UI | 12 个文件 | ~900 行 |
 | Tianyu Zhao | TA 仪表盘与简历与申请 | 8 个文件 | ~700 行 |
 | Jie Ren | MO 仪表盘与岗位 CRUD | 6 个文件 | ~700 行 |
-| Haopeng Jin | 推荐引擎与申请服务 | 7 个文件 | ~1,500 行 |
+| Haopeng Jin | 推荐引擎、申请服务、Sprint 4 安全与高可用 | 14 个文件 | ~2,100 行 |
 | Zhuang Hou | 管理员仪表盘与工作量 | 6 个文件 | ~500 行 |
 | Zexuan Dong | 数据层与基础设施 | 15 个文件 | ~1,200 行 |
 
@@ -256,13 +256,21 @@ public ActionResult createJob(UserProfile actor, String title,
 
 ---
 
-### 2.4 Haopeng Jin — 推荐引擎与申请服务与搜索过滤
+### 2.4 Haopeng Jin — 推荐引擎、申请服务与 Sprint 4 安全/高可用加固
 
-**负责文件**: `RecommendationService.java`(626行), `ApplicationService.java`(415行), `JobDetailServlet.java`, `UpdateApplicationStatusServlet.java`, `DashboardServlet.java`(搜索/过滤逻辑), `JobRecommendation.java`, `job-detail.jsp`, `dashboard-ta.jsp`(搜索 UI), `dashboard-mo.jsp`(搜索 UI), `DownloadCvServlet.java`(文件名优化), `data/applications/`
+**负责文件**: `RecommendationService.java`(626行), `ApplicationService.java`(415行), `AppServlet.java`, `LogoutServlet.java`, `UserService.java`, `JsonFileStore.java`, `IdCounterRepository.java`, `HealthServlet.java`, `PasswordHasher.java`, `JobDetailServlet.java`, `UpdateApplicationStatusServlet.java`, `DashboardServlet.java`(搜索/过滤逻辑), `JobRecommendation.java`, `job-detail.jsp`, `dashboard-ta.jsp`(搜索 UI), `dashboard-mo.jsp`(搜索 UI), `DownloadCvServlet.java`(文件名优化), `data/applications/`
 
-**对应 Backlog**: #4 浏览岗位, #8 接受/拒绝, #14 搜索过滤, #16 实时申请人数, #19 AI 技能匹配
+**对应 Backlog**: #4 浏览岗位, #8 接受/拒绝, #14 搜索过滤, #16 实时申请人数, #19 AI 技能匹配, Sprint 4 安全与高可用加固
 
 #### 功能介绍（演示说明）
+
+**Sprint 4 安全与高可用加固**：
+- 在 `AppServlet` 中补齐全站 CSRF 防护：所有 POST 表单携带 session token，缺失或不匹配时返回 HTTP 403。
+- 将 logout 从 GET 链接改为 POST 表单，避免爬虫、预览请求或恶意链接触发登出状态变更。
+- 在 `UserService.registerUser()` 中加入同步临界区，使“用户名唯一性检查 + 用户创建”在并发注册时保持原子性。
+- 加固文件持久化层 `JsonFileStore`：JSON/CSV 写入前通过同级 `.lock` 文件和 `FileChannel.lock()` 串行化，写失败时清理临时文件，目录读取遇到损坏 JSON 时跳过单个文件而不是让整页失败。
+- `IdCounterRepository` 的计数器读/更新/写入被包在跨进程文件锁中，降低多本地服务实例共享同一 `data/` 目录时的重复 ID 风险。
+- 保留 `/health` 作为可用性探针，方便部署和负载均衡实验在转发流量前检查文件存储是否可读。
 
 **全角色搜索与过滤系统** — v3.0.3 新增
 

@@ -25,7 +25,7 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public ActionResult registerUser(String username, String password, String confirmPassword,
+    public synchronized ActionResult registerUser(String username, String password, String confirmPassword,
                                      String roleStr, String name, String email,
                                      IdCounterRepository idCounterRepository) {
         if (username == null || username.isBlank()) {

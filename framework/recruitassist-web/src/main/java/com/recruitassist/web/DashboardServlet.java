@@ -80,9 +80,12 @@ public class DashboardServlet extends AppServlet {
                 .filter(application -> application.getStatus() == ApplicationStatus.ACCEPTED)
                 .count();
 
+        long unreadNotificationCount = services(req).notificationService().unreadCountForUser(user.getUserId());
         req.setAttribute("recommendedJobs", recommendedJobs);
         req.setAttribute("topRecommendation", recommendedJobs.isEmpty() ? null : recommendedJobs.get(0));
         req.setAttribute("applications", applications);
+        req.setAttribute("notifications", services(req).notificationService().findRecentForUser(user.getUserId(), 5));
+        req.setAttribute("unreadNotificationCount", unreadNotificationCount);
         req.setAttribute("applicationsByJobId", services(req).applicationService().mapByJobIdForApplicant(user.getUserId()));
         req.setAttribute("jobsById", services(req).jobService().indexById());
         req.setAttribute("currentWorkload", services(req).workloadService().workloadForUser(user.getUserId()));
