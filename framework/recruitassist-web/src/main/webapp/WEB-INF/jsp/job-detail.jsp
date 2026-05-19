@@ -327,7 +327,7 @@
                             <td>
                                 <c:choose>
                                     <c:when test="${candidate.cvAvailable}">
-                                        <a class="inline-link" href="${pageContext.request.contextPath}/cv/download?userId=${candidate.userId}&jobId=${job.jobId}">Download CV</a>
+                                        <a class="inline-link" href="${pageContext.request.contextPath}/pdf/share?token=${candidate.pdfShareToken}&jobId=${job.jobId}" target="_blank" rel="noopener">Open PDF link</a>
                                         <div class="muted-copy">${candidate.cvUploadedAtLabel}</div>
                                     </c:when>
                                     <c:otherwise>

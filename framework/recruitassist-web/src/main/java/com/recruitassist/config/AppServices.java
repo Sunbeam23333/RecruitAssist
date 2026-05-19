@@ -12,6 +12,7 @@ import com.recruitassist.service.ApplicationService;
 import com.recruitassist.service.AuthService;
 import com.recruitassist.service.JobService;
 import com.recruitassist.service.NotificationService;
+import com.recruitassist.service.PdfShareService;
 import com.recruitassist.service.RecommendationService;
 import com.recruitassist.service.UserService;
 import com.recruitassist.service.WorkloadService;
@@ -24,6 +25,7 @@ public class AppServices {
     private final JobService jobService;
     private final WorkloadService workloadService;
     private final NotificationService notificationService;
+    private final PdfShareService pdfShareService;
     private final RecommendationService recommendationService;
     private final ApplicationService applicationService;
     private final IdCounterRepository idCounterRepository;
@@ -58,6 +60,7 @@ public class AppServices {
                 notificationService,
                 recommendationService,
                 userService);
+        this.pdfShareService = new PdfShareService(userService, jobService, applicationService);
     }
 
     public SystemConfig systemConfig() {
@@ -86,6 +89,10 @@ public class AppServices {
 
     public NotificationService notificationService() {
         return notificationService;
+    }
+
+    public PdfShareService pdfShareService() {
+        return pdfShareService;
     }
 
     public ApplicationService applicationService() {

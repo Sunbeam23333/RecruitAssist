@@ -11,7 +11,7 @@
 | Yi Qi | 登录、注册、首页与 UI | 12 个文件 | ~900 行 |
 | Tianyu Zhao | TA 仪表盘与简历与申请 | 8 个文件 | ~700 行 |
 | Jie Ren | MO 仪表盘与岗位 CRUD | 6 个文件 | ~700 行 |
-| Haopeng Jin | 推荐引擎、申请服务、Sprint 4 安全与高可用 | 14 个文件 | ~2,100 行 |
+| Haopeng Jin | 推荐引擎、申请服务、PDF Token 分享、Sprint 4 安全与高可用 | 16 个文件 | ~2,250 行 |
 | Zhuang Hou | 管理员仪表盘与工作量 | 6 个文件 | ~500 行 |
 | Zexuan Dong | 数据层与基础设施 | 15 个文件 | ~1,200 行 |
 
@@ -22,9 +22,9 @@
 | 成员 | 负责功能区域 | 主要代码路径 | 功能说明 | 具体例子 / 演示证据 |
 |------|--------------|--------------|----------|---------------------|
 | Yi Qi | 登录、注册、首页、会话入口流程和 UI 优化 | `LoginServlet.java`, `RegisterServlet.java`, `LogoutServlet.java`, `HomeServlet.java`, `AuthService.java`, `UserService.registerUser()`, `login.jsp`, `register.jsp`, `home.jsp`, `assets/css/app.css`, `assets/js/app.js` | 负责所有角色进入系统前后的入口体验：用户可以访问首页、查看实时系统统计、使用演示账号快速登录、注册 TA/MO 账号、登录后进入对应仪表盘，并通过 Flash 消息获得反馈。登录/注册路径包含输入校验、粘性表单、统一错误提示、密码哈希、失败锁定和会话清理。 | 演示：打开 `/home`，点击 TA 快速登录卡片或进入 `/login` 选择 `alice.ta`，登录后进入 TA 仪表盘；也可以通过 `/register` 创建一个新 TA 账号，看到成功提示后再用新账号登录。 |
-| Tianyu Zhao | TA 仪表盘、TA Profile 编辑、CV 上传/下载、申请和撤回入口 | `DashboardServlet.renderTaDashboard()`, `UpdateProfileServlet.java`, `UploadCvServlet.java`, `DownloadCvServlet.java`, `ApplyServlet.java`, `WithdrawApplicationServlet.java`, `dashboard-ta.jsp`, `UserService.updateTaProfile()` | 负责 TA 的主要工作区：TA 可以维护个人资料证据、上传 CV、查看推荐岗位卡片、申请合适岗位、撤回可撤回申请，并在申请历史里跟踪状态。CV 流程包含文件类型白名单、大小限制、旧文件替换和基于角色的下载权限控制。 | 演示：登录 `alice.ta`，修改 skills 或 availability，上传一份 `.txt`/PDF CV，点击推荐岗位的 Apply，随后在申请历史表中看到新增申请、推荐分和状态。 |
+| Tianyu Zhao | TA 仪表盘、TA Profile 编辑、CV 上传/下载、申请和撤回入口 | `DashboardServlet.renderTaDashboard()`, `UpdateProfileServlet.java`, `UploadCvServlet.java`, `DownloadCvServlet.java`, `ApplyServlet.java`, `WithdrawApplicationServlet.java`, `dashboard-ta.jsp`, `UserService.updateTaProfile()` | 负责 TA 的主要工作区：TA 可以维护个人资料证据、上传 CV、查看推荐岗位卡片、申请合适岗位、撤回可撤回申请，并在申请历史里跟踪状态。CV 流程包含文件类型白名单、大小限制、旧文件替换和基于角色的访问权限控制。 | 演示：登录 `alice.ta`，修改 skills 或 availability，上传一份 `.txt`/PDF CV，点击推荐岗位的 Apply，随后在申请历史表中看到新增申请、推荐分和状态。 |
 | Jie Ren | MO 仪表盘、岗位创建/编辑、岗位开启关闭、候选人审核表 | `CreateJobServlet.java`, `UpdateJobServlet.java`, `ChangeJobStatusServlet.java`, `JobService.java`, `UpdateApplicationStatusServlet.java`, `dashboard-mo.jsp`, `job-detail.jsp`, `data/jobs/` | 负责 Recruiter/MO 工作流：MO 可以创建经过校验的岗位、编辑自己发布的岗位、关闭或重开岗位、查看候选人列表、下载符合权限的 CV，并更新候选人申请状态。岗位校验覆盖必填项、未来截止日期、正数配额/工时、技能解析和 XSS 文本清洗。 | 演示：登录 `mo.chen`，创建一个 required skills 包含 `Java, Testing` 的岗位，进入岗位详情页查看候选人排名，然后在候选人表中将 TA 设为 shortlisted 或 accepted。 |
-| Haopeng Jin | 推荐引擎、申请生命周期、搜索过滤、Sprint 4 安全与高可用加固 | `RecommendationService.java`, `ApplicationService.java`, `JobDetailServlet.java`, `DashboardServlet.java`, `AppServlet.java`, `JsonFileStore.java`, `IdCounterRepository.java`, `LogoutServlet.java`, `scripts/load_test_recruitassist.py` | 负责可解释推荐和关键状态变更层。推荐引擎从 6 个维度给 TA-岗位配对评分，并展示匹配/缺失技能和自然语言解释。申请服务负责防重复申请、状态更新、审计日志和配额满自动关闭岗位；Sprint 4 进一步补齐 CSRF、POST logout、注册并发锁、跨进程文件锁和负载测试脚本。 | 演示：登录 `alice.ta` 对比推荐百分比和缺失技能，申请一个岗位；再登录 `mo.chen` 接受/拒绝该申请。安全证据：查看表单隐藏 `csrfToken` 和 `/health`；高并发证据：运行 `scripts/load_test_recruitassist.py --scenario readonly`。 |
+| Haopeng Jin | 推荐引擎、申请生命周期、搜索过滤、永久 PDF token 分享、Sprint 4 安全与高可用加固 | `RecommendationService.java`, `ApplicationService.java`, `JobDetailServlet.java`, `DashboardServlet.java`, `AppServlet.java`, `JsonFileStore.java`, `IdCounterRepository.java`, `LogoutServlet.java`, `PdfShareService.java`, `SharedPdfServlet.java`, `scripts/load_test_recruitassist.py` | 负责可解释推荐和关键状态变更层。推荐引擎从 6 个维度给 TA-岗位配对评分，并展示匹配/缺失技能和自然语言解释。申请服务负责防重复申请、状态更新、审计日志和配额满自动关闭岗位；Sprint 4 进一步补齐 CSRF、POST logout、注册并发锁、跨进程文件锁、永久受保护 PDF token 链接和负载测试脚本。 | 演示：登录 `alice.ta` 对比推荐百分比和缺失技能，申请一个岗位；再登录 `mo.chen` 接受/拒绝该申请。安全证据：查看表单隐藏 `csrfToken`、打开受保护 `/pdf/share?token=...` 链接和 `/health`；高并发证据：运行 `scripts/load_test_recruitassist.py --scenario readonly`。 |
 | Zhuang Hou | Admin 仪表盘、工作量监控、全局招聘概览、CSV 导出 | `DashboardServlet.renderAdminDashboard()`, `WorkloadService.java`, `AdminExportServlet.java`, `dashboard-admin.jsp`, `WorkloadEntry.java`, `SystemConfig.java`, `data/system/config.json` | 负责管理员视角：Admin 可以查看全局岗位和最近申请，按配置阈值监控 TA 工作量，识别超载 TA，筛选岗位，并导出 jobs/applications/workload 三类 CSV 供报告和验收截图使用。 | 演示：登录 `admin`，查看 Admin Dashboard 的 KPI 和 TA workload 表，按状态/关键词筛选岗位，然后点击 CSV 导出按钮下载岗位、申请和工作量报表。 |
 | Zexuan Dong | 文件数据层、仓储、应用启动、种子数据、审计日志和测试 | `AppPaths.java`, `AppServices.java`, `JsonFileStore.java`, `UserRepository.java`, `JobRepository.java`, `ApplicationRepository.java`, `AuditRepository.java`, `SystemConfigRepository.java`, `IdCounterRepository.java`, `AppBootstrapListener.java`, `src/test/java/**` | 负责课程要求的零数据库持久化基础：用户、岗位、申请、通知、配置、计数器、CV 文件和审计日志都存储在 JSON/CSV/TXT 文件中。Repository 层统一文件访问，`AppServices` 完成服务装配，启动监听器创建必要目录，测试保护核心数据完整性。 | 演示证据：展示 `data/users`, `data/jobs`, `data/applications`, `data/system/config.json`, `logs/access/audit.csv`；运行 `mvn verify` 展示仓储/服务测试和 JaCoCo 覆盖率报告。 |
 
@@ -209,7 +209,7 @@ public ActionResult updateTaProfile(UserProfile actor, String name,
 
 **CV 上传安全控制** — `UploadCvServlet.java` 第28-67行：白名单校验（pdf/doc/docx/txt）→ 5MB 大小限制 → 删除旧 CV → 保存新 CV（路径标准化防遍历）→ 更新元数据。
 
-**CV 下载权限控制** — `DownloadCvServlet.java` 第50-71行：Admin 全权限；本人可下载自己的；MO 仅能下载申请了自己岗位的候选人 CV。
+**CV 下载权限控制** — `DownloadCvServlet.java`：Admin 全权限；本人可下载自己的；MO 仅能下载申请了自己岗位的候选人 CV。
 
 ---
 
@@ -271,7 +271,7 @@ public ActionResult createJob(UserProfile actor, String title,
 
 ### 2.4 Haopeng Jin — 推荐引擎、申请服务与 Sprint 4 安全/高可用加固
 
-**负责文件**: `RecommendationService.java`(626行), `ApplicationService.java`(415行), `AppServlet.java`, `LogoutServlet.java`, `UserService.java`, `JsonFileStore.java`, `IdCounterRepository.java`, `HealthServlet.java`, `PasswordHasher.java`, `JobDetailServlet.java`, `UpdateApplicationStatusServlet.java`, `DashboardServlet.java`(搜索/过滤逻辑), `JobRecommendation.java`, `job-detail.jsp`, `dashboard-ta.jsp`(搜索 UI), `dashboard-mo.jsp`(搜索 UI), `DownloadCvServlet.java`(文件名优化), `data/applications/`
+**负责文件**: `RecommendationService.java`(626行), `ApplicationService.java`(415行), `AppServlet.java`, `LogoutServlet.java`, `UserService.java`, `JsonFileStore.java`, `IdCounterRepository.java`, `HealthServlet.java`, `PasswordHasher.java`, `PdfShareService.java`, `SharedPdfServlet.java`, `JobDetailServlet.java`, `UpdateApplicationStatusServlet.java`, `DashboardServlet.java`(搜索/过滤逻辑), `JobRecommendation.java`, `job-detail.jsp`, `dashboard-ta.jsp`(搜索 UI), `dashboard-mo.jsp`(搜索 UI), `DownloadCvServlet.java`(文件名优化), `data/applications/`
 
 **对应 Backlog**: #4 浏览岗位, #8 接受/拒绝, #14 搜索过滤, #16 实时申请人数, #19 AI 技能匹配, Sprint 4 安全与高可用加固
 
@@ -283,6 +283,7 @@ public ActionResult createJob(UserProfile actor, String title,
 - 在 `UserService.registerUser()` 中加入同步临界区，使“用户名唯一性检查 + 用户创建”在并发注册时保持原子性。
 - 加固文件持久化层 `JsonFileStore`：JSON/CSV 写入前通过同级 `.lock` 文件和 `FileChannel.lock()` 串行化，写失败时清理临时文件，目录读取遇到损坏 JSON 时跳过单个文件而不是让整页失败。
 - `IdCounterRepository` 的计数器读/更新/写入被包在跨进程文件锁中，降低多本地服务实例共享同一 `data/` 目录时的重复 ID 风险。
+- 新增永久受保护 PDF token 分享：`PdfShareService` 为每个 CV 所有者生成稳定随机 token，`SharedPdfServlet` 在返回内联 PDF 前仍校验登录状态、TA 本人访问、MO 岗位归属或 Admin 角色。
 - 保留 `/health` 作为可用性探针，方便部署和负载均衡实验在转发流量前检查文件存储是否可读。
 
 **全角色搜索与过滤系统** — v3.0.3 新增

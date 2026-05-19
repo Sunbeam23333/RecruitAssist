@@ -55,7 +55,7 @@
 | 负责人 | 功能区域 | 代码路径 | 用户可见例子 |
 |--------|----------|----------|--------------|
 | Yi Qi | 登录、注册、首页、会话入口 UI | `LoginServlet.java`, `RegisterServlet.java`, `LogoutServlet.java`, `HomeServlet.java`, `login.jsp`, `register.jsp`, `home.jsp` | 访客打开 `/home` 查看实时统计，使用快速登录或注册 TA/MO 账号，然后进入对应仪表盘。 |
-| Tianyu Zhao | TA 仪表盘、Profile、CV、申请/撤回流程 | `UpdateProfileServlet.java`, `UploadCvServlet.java`, `DownloadCvServlet.java`, `ApplyServlet.java`, `WithdrawApplicationServlet.java`, `dashboard-ta.jsp` | TA 修改技能、上传 CV、申请推荐岗位，并在申请历史中看到记录。 |
+| Tianyu Zhao | TA 仪表盘、Profile、CV、永久 PDF 链接、申请/撤回流程 | `UpdateProfileServlet.java`, `UploadCvServlet.java`, `DownloadCvServlet.java`, `SharedPdfServlet.java`, `PdfShareService.java`, `ApplyServlet.java`, `WithdrawApplicationServlet.java`, `dashboard-ta.jsp` | TA 修改技能、上传 CV、打开永久受保护 PDF 链接、申请推荐岗位，并在申请历史中看到记录。 |
 | Jie Ren | MO 仪表盘、岗位 CRUD、候选人管理 | `CreateJobServlet.java`, `UpdateJobServlet.java`, `ChangeJobStatusServlet.java`, `JobService.java`, `dashboard-mo.jsp`, `job-detail.jsp` | MO 创建岗位、编辑要求、查看排序后的候选人，并将申请改为 Shortlisted/Accepted/Rejected。 |
 | Haopeng Jin | 推荐引擎、申请生命周期、安全与高可用加固 | `RecommendationService.java`, `ApplicationService.java`, `AppServlet.java`, `JsonFileStore.java`, `IdCounterRepository.java`, `scripts/load_test_recruitassist.py` | 系统解释 TA-岗位匹配原因，防重复申请，校验 CSRF token，提供 `/health`，并支持负载测试。 |
 | Zhuang Hou | Admin 仪表盘、工作量监控、CSV 导出 | `DashboardServlet.renderAdminDashboard()`, `WorkloadService.java`, `AdminExportServlet.java`, `dashboard-admin.jsp` | Admin 查看 TA 工作量风险，并导出 jobs/applications/workload CSV 报表。 |
@@ -234,6 +234,21 @@ TA 仪表盘提供全方位的工作台：
 - 存储为 `{userId}_cv.{扩展名}` 在 `data/cv/` 目录
 - 重新上传时自动删除旧 CV
 - 文件元数据（文件名、上传时间）保存到用户 Profile
+- 每个 CV 所有者会获得一个永久随机 `pdfShareToken`，保存在 `UserProfile` 中
+- token 链接格式为 `/pdf/share?token=...`；TA 可打开自己的链接，MO 只能打开自己岗位候选人的链接，Admin 可打开所有有效 CV 链接
+- `SharedPdfServlet.java` 代理文件响应并做角色校验，不把 `data/cv/` 目录暴露为公开静态资源
+
+#### 4.2.7 永久 PDF 链接设计（`/pdf/share`）
+
+PDF 链接按用户维度长期有效，不是临时链接；但 token 本身并不等于完全公开访问，后端仍会校验当前登录用户和业务关系：
+
+- **Token 所属者**：`UserProfile.pdfShareToken`，由 `PdfShareService.ensureToken()` 生成
+- **访问路径**：TA/Admin 使用 `GET /pdf/share?token={token}`，MO 审核候选人时使用 `GET /pdf/share?token={token}&jobId={jobId}`
+- **TA 规则**：只能打开自己的 CV 链接
+- **MO 规则**：只有当候选人申请了该 MO 拥有的岗位时，MO 才能打开该候选人链接
+- **Admin 规则**：可以打开任意有效 CV 链接，用于审核和验收
+- **存储规则**：真实文件仍保存在 `data/cv/`；Servlet 会标准化路径并防止目录穿越
+- **体验例子**：TA 在 Profile & CV 区看到 "Open permanent PDF link"；MO 在候选人队列看到 "Open PDF"；Admin 在 Latest applications 表中看到 "Open PDF"
 
 ### 4.3 MO（课程负责人）功能
 
@@ -289,13 +304,13 @@ MO 可执行的状态转换：
 
 **状态通知**：状态更新成功后会为 TA 创建站内通知，TA 可在仪表盘查看入围/接受/拒绝结果。
 
-#### 4.3.6 下载 CV（`/cv/download`）
+#### 4.3.6 打开候选人 PDF（`/pdf/share`）
 
 访问控制：
-- MO 只能下载申请了自己岗位的候选人 CV
-- Admin 可以下载任何 CV
-- TA 只能下载自己的 CV
-- 返回文件流 + `Content-Disposition: attachment`
+- MO 只能打开申请了自己岗位的候选人 CV/PDF 链接
+- Admin 可以打开任何 CV/PDF 链接
+- TA 只能打开自己的 CV/PDF 链接
+- `/pdf/share` 以内联方式返回文件，方便浏览器预览；`/cv/download` 仍保留用于附件下载
 
 ### 4.4 Admin（管理员）功能
 
@@ -454,7 +469,7 @@ logs/
 | GET | `/health` | 公开 | 部署健康检查 / 可用性探针 |
 | GET/POST | `/login` | 公开 | 登录表单 / 认证 |
 | GET/POST | `/register` | 公开 | 注册表单 / 创建新账户（仅 TA 和 MO） |
-| GET | `/logout` | 已登录 | 结束会话 |
+| POST | `/logout` | 已登录 | 带 CSRF token 结束会话 |
 | GET | `/dashboard` | 已登录 | 角色化仪表盘 |
 | GET | `/jobs/detail?id={jobId}` | 已登录 | 岗位详情（角色化视图） |
 | POST | `/jobs/create` | MO | 创建新岗位 |
@@ -468,3 +483,4 @@ logs/
 | POST | `/profile/update` | TA | 更新个人 Profile |
 | POST | `/profile/cv/upload` | TA | 上传 CV 文件 |
 | GET | `/cv/download?userId={id}` | 认证+ACL | 下载 CV 文件 |
+| GET | `/pdf/share?token={token}` | 认证+ACL | 打开永久受保护 CV/PDF 链接 |

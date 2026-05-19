@@ -241,7 +241,7 @@
                             <td>
                                 <c:choose>
                                     <c:when test="${candidate.cvAvailable}">
-                                        <a class="secondary-button small-button" href="${pageContext.request.contextPath}/cv/download?userId=${candidate.userId}&jobId=${job.jobId}">Download</a>
+                                        <a class="secondary-button small-button" href="${pageContext.request.contextPath}/pdf/share?token=${candidate.pdfShareToken}&jobId=${job.jobId}" target="_blank" rel="noopener">Open PDF</a>
                                     </c:when>
                                     <c:otherwise><span class="muted-copy">No CV</span></c:otherwise>
                                 </c:choose>

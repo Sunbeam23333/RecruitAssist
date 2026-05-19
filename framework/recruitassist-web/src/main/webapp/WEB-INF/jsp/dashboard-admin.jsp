@@ -197,6 +197,7 @@
                         <th>Job</th>
                         <th>Status</th>
                         <th>Score</th>
+                        <th>CV PDF</th>
                         <th>Submitted</th>
                     </tr>
                     </thead>
@@ -211,6 +212,14 @@
                             </td>
                             <td><span class="status-pill status-${application.status.cssClass}">${application.status.label}</span></td>
                             <td>${application.recommendationPercent}%</td>
+                            <td>
+                                <c:choose>
+                                    <c:when test="${usersById[application.applicantId].cvAvailable}">
+                                        <a class="inline-link" href="${pageContext.request.contextPath}/pdf/share?token=${usersById[application.applicantId].pdfShareToken}&jobId=${application.jobId}" target="_blank" rel="noopener">Open PDF</a>
+                                    </c:when>
+                                    <c:otherwise><span class="muted-copy">No CV</span></c:otherwise>
+                                </c:choose>
+                            </td>
                             <td>${application.applyTimeLabel}</td>
                         </tr>
                     </c:forEach>

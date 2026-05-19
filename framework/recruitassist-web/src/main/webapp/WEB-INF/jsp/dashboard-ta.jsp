@@ -336,6 +336,8 @@
                 <strong>Current CV:</strong> <code>${user.cvFileLabel}</code>
                 <span class="muted-copy">Uploaded ${user.cvUploadedAtLabel}</span>
                 <a class="primary-button small-button" href="${pageContext.request.contextPath}/cv/download?userId=${user.userId}">Download CV</a>
+                <a class="secondary-button small-button" href="${pageContext.request.contextPath}/pdf/share?token=${user.pdfShareToken}" target="_blank" rel="noopener">Open permanent PDF link</a>
+                <code>${pageContext.request.contextPath}/pdf/share?token=${user.pdfShareToken}</code>
             </div>
         </c:if>
         <c:if test="${not user.cvAvailable}">
